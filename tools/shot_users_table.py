@@ -42,11 +42,11 @@ FAKE_USERS = [
 ]
 
 FAKE_PLANS = [
-    {"code": "free", "name": "默认档", "level": 0,
+    {"code": "free", "name": "免费版", "level": 0,
      "max_keys": 3, "rate_limit": 60, "daily_quota": 1000, "is_active": True, "users": 0},
-    {"code": "pro", "name": "进阶档", "level": 10,
+    {"code": "pro", "name": "专业版", "level": 10,
      "max_keys": 10, "rate_limit": 300, "daily_quota": 50000, "is_active": True, "users": 1},
-    {"code": "vip", "name": "宽松档", "level": 20,
+    {"code": "vip", "name": "旗舰版", "level": 20,
      "max_keys": 50, "rate_limit": 1200, "daily_quota": -1, "is_active": True, "users": 1},
 ]
 

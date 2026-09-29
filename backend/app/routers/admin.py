@@ -41,7 +41,9 @@ from app.plans import (
     list_plans,
 )
 from app.ratelimit import blacklist_key, redis_status
+from app.points import admin_adjust, settle_expired
 from app.schemas import (
+    AdminPointsIn,
     ApiResponse,
     PlanIn,
     PlanUpdateIn,
@@ -109,6 +111,12 @@ def _user_row(u: User, kc: dict[int, int], calls: dict[int, int],
         "active_keys": kc.get(u.id, 0),
         "key_quota": p.get("max_keys", 3),
         "calls_24h": calls.get(u.id, 0),
+        #: 积分与到期时间：管理员要能看出这个用户的额度是兑换来的还是指派的
+        "points": u.points or 0,
+        "points_earned": u.points_earned or 0,
+        "plan_expires_at": u.plan_expires_at,
+        "plan_days_left": (u.plan_expires_at - datetime.utcnow()).days
+        if u.plan_expires_at else None,
     }
 
 
@@ -426,6 +434,28 @@ def set_tier(user_id: int, payload: TierIn | None = None, tier: str | None = Non
             f"限流 {plan['rate_limit']}/分钟，日配额 "
             f"{'不限' if plan['daily_quota'] < 0 else plan['daily_quota']}）",
         data={"id": user_id, "tier": value, "tier_name": plan["name"]},
+    )
+
+
+@router.post("/users/{user_id}/points", summary="调整用户积分")
+def adjust_points(user_id: int, payload: AdminPointsIn,
+                  db: Session = Depends(get_db), _u=Depends(get_admin)):
+    """管理员补发或扣减积分。
+
+    这是运营通道，**不涉及任何金额** —— 不存在"充值买积分"的接口，
+    也不应该新增。每一笔都会写进 point_logs 便于追溯。
+    """
+    u = db.scalar(select(User).where(User.id == user_id))
+    if not u:
+        raise HTTPException(404, "用户不存在")
+    try:
+        r = admin_adjust(db, u, payload.amount, payload.remark)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    verb = "发放" if payload.amount > 0 else "扣减"
+    return ApiResponse(
+        msg=f"已{verb} {abs(payload.amount)} 积分，当前余额 {r['points']}",
+        data={"id": user_id, "points": r["points"], "delta": payload.amount},
     )
 
 

@@ -24,6 +24,7 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models import ApiKey, ApiLog, User
 from app.plans import daily_usage, get_plan, list_plans
+from app.points import settle_expired
 from app.schemas import ApiResponse
 
 router = APIRouter(prefix="/quota", tags=["配额"])
@@ -43,6 +44,10 @@ def my_plan(db: Session = Depends(get_db), user: User = Depends(get_current_user
     这三项是限流链路的唯一真源：鉴权处读的是同一份 plan，
     所以控制台看到的数字和实际被拦下的时机永远一致。
     """
+    #: 先结算到期：否则会出现"控制台显示还有 3 天、接口已经按免费档限流"。
+    #: 和 deps.py 鉴权链用的是同一个函数、同一份判断，两边永远一致。
+    settle_expired(db, user)
+
     plan = get_plan(db, user.tier)
     used = daily_usage(db, user.id)
     quota = plan["daily_quota"]
@@ -52,11 +57,16 @@ def my_plan(db: Session = Depends(get_db), user: User = Depends(get_current_user
         .scalar() or 0
     )
 
+    exp = user.plan_expires_at
     return ApiResponse(data={
         "user_id": user.id,
         "email": user.email,
         "tier": user.tier,
         "plan": plan,
+        #: 积分与到期信息一并给出，控制台一次请求就能渲染完整
+        "points": user.points or 0,
+        "plan_expires_at": exp,
+        "plan_days_left": (exp - datetime.utcnow()).days if exp else None,
         "quota": {
             "max_keys": plan["max_keys"],
             "rate_limit": plan["rate_limit"],

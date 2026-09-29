@@ -120,6 +120,9 @@ class PlanIn(BaseModel):
     rate_limit: int = Field(default=60, ge=1)
     #: -1 = 不限
     daily_quota: int = Field(default=1000, ge=-1)
+    #: 签到积分兑换价。0 或 null 表示不可兑换（免费档/隐藏档）
+    redeem_points: int | None = Field(default=None, ge=0)
+    redeem_days: int = Field(default=30, ge=1, le=3650)
     features: list[str] = Field(default_factory=list)
     description: str = ""
     is_public: bool = True
@@ -135,11 +138,30 @@ class PlanUpdateIn(BaseModel):
     max_keys: int | None = Field(default=None, ge=0)
     rate_limit: int | None = Field(default=None, ge=1)
     daily_quota: int | None = Field(default=None, ge=-1)
+    redeem_points: int | None = Field(default=None, ge=0)
+    redeem_days: int | None = Field(default=None, ge=1, le=3650)
     features: list[str] | None = None
     description: str | None = None
     is_public: bool | None = None
     is_active: bool | None = None
     sort_order: int | None = None
+
+
+# ---------------- 积分 ----------------
+class RedeemIn(BaseModel):
+    """用积分兑换档位。plan_code 必须是配了兑换价的公开档位。"""
+
+    plan_code: str = Field(min_length=1, max_length=32)
+
+
+class AdminPointsIn(BaseModel):
+    """管理员调整某个用户的积分。正=补发，负=扣减。
+
+    这是运营通道，**不涉及任何金额**，也不允许把它做成变相收款。
+    """
+
+    amount: int = Field(description="变动积分，正数为发放，负数为扣减")
+    remark: str = ""
 
 
 # ---------------- 行情 ----------------

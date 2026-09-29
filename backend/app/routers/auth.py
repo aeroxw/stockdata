@@ -31,7 +31,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     # 第一个注册的用户自动成为管理员，方便开箱即用
     is_first = db.scalar(select(User).limit(1)) is None
 
-    #: 新用户一律落到默认档（free）。开源版不售卖任何套餐，也不设试用期 ——
+    #: 新用户一律落到免费版（free）。开源版不售卖任何套餐，也不设试用期 ——
     #: 想要更大额度就让管理员在后台改档位。
     user = User(
         email=payload.email,

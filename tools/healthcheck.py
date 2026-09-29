@@ -209,8 +209,8 @@ if kid:
     st, _ = req(f"/apikey/{kid}/purge", "DELETE", tok=TOK)
     ck("物理删除已吊销 Key", st == 200, f"{st}")
 
-# ---------------------------------------------------------------- 8. 计费
-sect("8. 配额与用量")
+# ---------------------------------------------------------------- 8. 配额与积分
+sect("8. 配额、积分与兑换")
 st, js = req("/quota/plans", tok=TOK)
 plans = (js.get("data") or {}).get("items") or []
 ck("档位列表", st == 200 and len(plans) >= 3, f"{st} {[p['code'] for p in plans]}")
@@ -229,6 +229,9 @@ ck("返回三项额度", {"max_keys", "rate_limit", "daily_quota"} <= set(b.get(
    str(sorted((b.get("quota") or {}).keys())))
 ck("返回已用情况", "calls_24h" in (b.get("usage") or {}),
    str(sorted((b.get("usage") or {}).keys())))
+#: 积分与到期时间是积分机制的核心返回，控制台靠它们渲染
+ck("返回积分与到期信息", "points" in b and "plan_expires_at" in b,
+   f"积分={b.get('points')} 到期={b.get('plan_expires_at')}")
 
 st, js = req("/quota/usage?days=7", tok=TOK)
 u = js.get("data") or {}
@@ -239,9 +242,39 @@ ck("用量统计（控制台图表数据源）", st == 200 and bool(u.get("daily
 st, js = req("/admin/users?limit=5", tok=TOK)
 rows = (js.get("data") or {}).get("items") or []
 ck("后台用户列表可用", st == 200 and bool(rows), f"{st} {len(rows)}个")
-ck("后台用户行不含余额/有效期字段",
-   bool(rows) and all(("balance" not in r and "plan_expires_at" not in r) for r in rows),
-   str([k for r in rows for k in r if k in ("balance", "plan_expires_at", "is_trial")]))
+#: balance / is_trial 是已删除的计费列，绝不能回来；
+#: 但 plan_expires_at 在积分机制里是合法的（兑换来的档位到期日），必须存在。
+ck("后台用户行不含余额/试用期字段",
+   bool(rows) and all(("balance" not in r and "is_trial" not in r) for r in rows),
+   str([k for r in rows for k in r if k in ("balance", "is_trial")]))
+ck("后台用户行带积分与到期时间",
+   bool(rows) and all("points" in r for r in rows),
+   str([r.get("points") for r in rows]))
+
+# ---- 签到积分 ----
+st, js = req("/points/checkin", "POST", tok=TOK)
+ck("签到", st == 200, f"{st} {js.get('msg')}")
+st, js = req("/points/checkin", "POST", tok=TOK)
+ck("同日重复签到不加分",
+   (js.get("data") or {}).get("already") is True, f"{st} {js.get('msg')}")
+
+st, js = req("/points/me", tok=TOK)
+p = js.get("data") or {}
+ck("积分概览可读", st == 200 and "points" in p, f"{st} 积分={p.get('points')}")
+opts = p.get("options") or []
+ck("可兑换档位 2 个", len(opts) == 2, str([o["code"] for o in opts]))
+ck("兑换价 专业版15 / 旗舰版30",
+   {o["code"]: o["redeem_points"] for o in opts} == {"pro": 15, "vip": 30},
+   str({o["code"]: o["redeem_points"] for o in opts}))
+
+st, js = req("/points/logs?limit=5", tok=TOK)
+ck("积分流水可读", st == 200 and "items" in (js.get("data") or {}), f"{st}")
+
+#: 积分不足时兑换必须被拒，这是配额机制不会被人绕过的保证
+cost_min = min((o["redeem_points"] for o in opts), default=0)
+if p.get("points", 0) < cost_min:
+    st, js = req("/points/redeem", "POST", {"plan_code": "pro"}, tok=TOK)
+    ck("积分不足时兑换被拒(400)", st == 400, f"{st} {js.get('detail')}")
 
 sect("9. 支付已彻底移除（安全）")
 #: 开源版不该再有任何计费端点。这里逐个确认它们已经 404，

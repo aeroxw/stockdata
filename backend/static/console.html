@@ -69,6 +69,29 @@
   .q-fill.warn { background: var(--warn); }
   .q-fill.full { background: var(--err); }
 
+  /* 积分 */
+  .pts-bar {
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 6px 0 4px;
+  }
+  .pts-num { font-size: 40px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+  .pts-lbl { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .pts-tip {
+    margin-top: 16px; padding: 11px 14px; border-radius: 10px;
+    background: var(--bg-soft); border: 1px solid var(--border);
+    font-size: 13px; color: var(--text-dim); line-height: 1.75;
+  }
+  .pts-expire {
+    margin-top: 14px; font-size: 13.5px; color: var(--text-dim);
+  }
+  /* 兑换卡：比档位卡多一条"还差多少"的进度 */
+  .redeem-card { position: relative; }
+  .redeem-card .rcost {
+    font-size: 15px; font-weight: 700; font-family: var(--mono);
+    margin: 12px 0 8px;
+  }
+  .redeem-card .rlack { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+
   .view { display: none; }
   .view.on { display: block; }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -277,6 +300,38 @@
 
         <!-- ==================== 我的配额 ==================== -->
         <section class="view" id="view-quota">
+          <!-- 签到积分 -->
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">签到积分</div>
+              <span class="chip" id="ckNote">—</span>
+            </div>
+            <div class="pts-bar">
+              <div>
+                <div class="pts-num" id="ptsNum">0</div>
+                <div class="pts-lbl">可用积分 · 累计获得 <b id="ptsEarned">0</b></div>
+              </div>
+              <button class="btn btn-primary" id="ckBtn" onclick="doCheckin()">今日签到 +1</button>
+              <a class="btn btn-ghost btn-sm" href="#" id="ckLogs" onclick="showPointLogs(event)">流水</a>
+            </div>
+            <div class="pts-expire" id="expireLine">—</div>
+            <div class="pts-tip">
+              积分<b>只能通过每日签到获得</b>，不能购买、不能转让，也没有任何充值入口。
+              它存在的唯一目的是挡住「注册完就甩脚本批量刷接口」的行为 ——
+              让额度流向真正长期使用的人，而不是卖东西。
+              档位到期后会自动回落免费版，<b>服务不会中断</b>。
+            </div>
+          </div>
+
+          <!-- 积分兑换 -->
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">积分兑换额度</div>
+              <span class="chip" id="redeemNote">—</span>
+            </div>
+            <div class="plan-grid" id="redeemGrid"><div class="empty">加载中…</div></div>
+          </div>
+
           <div class="panel">
             <div class="panel-head">
               <div class="panel-title">当前档位</div>
@@ -422,6 +477,7 @@ const state = {
   view: 'overview',
   me: null,          // /quota/me
   plans: [],         // /quota/plans
+  points: null,      // /points/me
   keys: [],
   usage: null,
 };
@@ -540,15 +596,21 @@ async function loadMe() {
   document.getElementById('ovKeysSub').textContent = `上限 ${q.max_keys} 个`;
   setBar('q2', usage.active_keys || 0, q.max_keys || 0,
     `${usage.active_keys || 0} / ${q.max_keys}`);
-  /* 限流不是"已用量"，这里按 1200 次/分钟（最宽松档的上限）做个能力刻度，
+  /* 限流不是"已用量"，这里按 1200 次/分钟（旗舰版的上限）做个能力刻度，
      让用户直观看到自己档位在整体体系里的位置 */
   setBar('q3', q.rate_limit || 0, 1200, `${q.rate_limit} 次/分钟`);
   setBar('q1', q.unlimited ? 0 : (usage.calls_24h || 0), q.unlimited ? 0 : (q.daily_quota || 0),
     q.unlimited ? `${nfmt(usage.calls_24h || 0)} 次 · 不限量`
       : `${nfmt(usage.calls_24h || 0)} / ${nfmt(q.daily_quota)}`);
 
+  /* 档位到期时间与积分：让用户不用切到配额页就知道还剩多久 */
   document.getElementById('ovBenefits').innerHTML = [
     `<div class="kv"><span>档位</span><b>${esc(plan.name || u.tier)}</b></div>`,
+    b.plan_expires_at
+      ? `<div class="kv"><span>有效期至</span><b>${String(b.plan_expires_at).slice(0, 10)}
+           （剩 ${b.plan_days_left} 天）</b></div>`
+      : `<div class="kv"><span>有效期</span><b>长期有效</b></div>`,
+    `<div class="kv"><span>可用积分</span><b>${b.points || 0} 分</b></div>`,
     `<div class="kv"><span>API Key 上限</span><b>${q.max_keys} 个</b></div>`,
     `<div class="kv"><span>单密钥限流</span><b>${q.rate_limit} 次/分钟</b></div>`,
     `<div class="kv"><span>每日调用</span><b>${q.unlimited ? '不限量' : nfmt(q.daily_quota) + ' 次'}</b></div>`,
@@ -710,6 +772,155 @@ async function loadQuotaView() {
     state.plans = (r.data || {}).items || [];
     renderPlans();
   } catch (e) { toast(e.message, 'err'); }
+  try {
+    await loadPoints();
+  } catch (e) {
+    /* 积分拉不到时把兑换区换成错误提示 + 重试按钮 ——
+       不能让它停在"加载中…"，否则用户会以为一直在加载 */
+    const box = document.getElementById('redeemGrid');
+    if (box) {
+      box.innerHTML = `${esc(e.message)}
+        <div style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm" onclick="go('quota', true)">重新加载</button>
+        </div>`;
+    }
+  }
+}
+
+/* ---------- 签到积分 ---------- */
+async function loadPoints() {
+  const r = await SD.api('/points/me');
+  state.points = r.data || {};
+  renderPoints();
+  return state.points;
+}
+
+function renderPoints() {
+  const p = state.points || {};
+  document.getElementById('ptsNum').textContent = p.points || 0;
+  document.getElementById('ptsEarned').textContent = p.points_earned || 0;
+
+  const btn = document.getElementById('ckBtn');
+  if (p.can_checkin) {
+    btn.textContent = '今日签到 +' + (p.checkin_points || 1);
+    btn.disabled = false;
+    btn.className = 'btn btn-primary';
+  } else {
+    btn.textContent = '今日已签到 ✓';
+    btn.disabled = true;
+    btn.className = 'btn btn-ghost';
+  }
+  document.getElementById('ckNote').textContent = p.last_checkin_date
+    ? '上次签到 ' + p.last_checkin_date : '还未签到过';
+
+  const el = document.getElementById('expireLine');
+  if (p.plan_expires_at) {
+    const d = String(p.plan_expires_at).slice(0, 10);
+    el.innerHTML = `当前「${esc((p.plan || {}).name)}」有效至 <b>${d}</b>，
+      剩余 <b>${p.plan_days_left}</b> 天 —— 到期自动回落免费版，接口仍可调用。`;
+  } else {
+    el.innerHTML = `当前「${esc((p.plan || {}).name)}」<b>长期有效</b>。`;
+  }
+
+  renderRedeem(p.options || []);
+}
+
+function renderRedeem(opts) {
+  const grid = document.getElementById('redeemGrid');
+  const note = document.getElementById('redeemNote');
+  if (!opts.length) {
+    grid.innerHTML = '<div class="empty">当前没有可用积分兑换的档位</div>';
+    if (note) note.textContent = '—';
+    return;
+  }
+  if (note) note.textContent = `可用 ${(state.points || {}).points || 0} 分`;
+
+  grid.innerHTML = opts.map((p) => {
+    const cur = p.is_current;
+    return `
+      <div class="plan-card redeem-card ${cur ? 'current' : ''}">
+        ${cur ? '<span class="plan-flag cur">当前档位</span>' : ''}
+        <div class="pname">${esc(p.name)}</div>
+        <div class="pdesc">${esc(p.description || '')}</div>
+        <div class="rcost">${p.redeem_points} 积分 · ${p.redeem_days} 天</div>
+        <ul class="plan-feats">
+          ${(p.features || []).slice(0, 4).map((f) => `<li>${esc(f)}</li>`).join('')}
+        </ul>
+        <div class="q-track">
+          <div class="q-fill ${p.affordable ? '' : 'warn'}" style="width:${p.progress}%"></div>
+        </div>
+        <div class="rlack">${p.affordable
+          ? (cur ? '积分足够，可续期（在剩余天数上顺延）' : '积分足够，可立即兑换')
+          : `还差 ${p.lack} 分 · 约 ${p.days_needed} 天签到`}</div>
+        <div>
+          <button class="btn ${p.affordable ? 'btn-primary' : 'btn-ghost'}"
+            ${p.affordable ? '' : 'disabled'}
+            onclick="doRedeem('${esc(p.code)}', '${esc(p.name)}', ${p.redeem_points})">
+            ${cur ? '续期' : '兑换'} · ${p.redeem_points} 分
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function doCheckin() {
+  const btn = document.getElementById('ckBtn');
+  btn.disabled = true;
+  try {
+    const r = await SD.api('/points/checkin', { method: 'POST' });
+    toast(r.msg || '签到成功', 'ok');
+    await loadPoints();
+    await loadMe();          // 顶栏与概览可能显示积分，一并刷新
+  } catch (e) {
+    toast(e.message, 'err');
+    btn.disabled = false;
+  }
+}
+
+async function doRedeem(code, name, cost) {
+  const ok = await confirmBox(`兑换「${name}」`,
+    `将消耗 <b>${cost}</b> 积分。<br><br>
+     同档兑换会在剩余天数上<b>顺延</b>，换更高的档则从今天起重新计算。<br>
+     到期后自动回落免费版，<b>服务不会中断</b>。`,
+    '确认兑换');
+  if (!ok) return;
+  try {
+    const r = await SD.api('/points/redeem', {
+      method: 'POST', body: JSON.stringify({ plan_code: code }),
+    });
+    toast(r.msg || '兑换成功', 'ok');
+    LOADED.delete('overview');   // 概览里的档位要跟着变
+    await loadPoints();
+    await loadMe();
+    renderCurrentQuota();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function showPointLogs(ev) {
+  ev.preventDefault();
+  openModal('积分流水', '<div class="empty">加载中…</div>');
+  const TYPE = {
+    checkin: '签到', redeem: '兑换',
+    grant: '管理员发放', deduct: '管理员扣减',
+  };
+  try {
+    const r = await SD.api('/points/logs?limit=30');
+    const items = r.data.items || [];
+    document.getElementById('modalBody').innerHTML = items.length ? `
+      <table class="mini">
+        <thead><tr><th>时间</th><th>类型</th><th>变动</th><th>余额</th><th>说明</th></tr></thead>
+        <tbody>${items.map((i) => `<tr>
+          <td class="cell-sub">${SD.fmtTime(i.created_at)}</td>
+          <td>${TYPE[i.type] || i.type}</td>
+          <td class="mono ${i.delta >= 0 ? 'txt-up' : 'txt-down'}">${i.delta >= 0 ? '+' : ''}${i.delta}</td>
+          <td class="mono">${i.balance_after}</td>
+          <td class="cell-sub">${esc(i.remark || '')}</td>
+        </tr>`).join('')}</tbody></table>`
+      : '<div class="empty">暂无记录</div>';
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML =
+      `<div class="alert alert-err">${esc(e.message)}</div>`;
+  }
 }
 
 function renderCurrentQuota() {

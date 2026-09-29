@@ -25,60 +25,68 @@ log = logging.getLogger("stockdata.plans")
 
 
 # ---------------------------------------------------------------- 内置档位
-#: 首次启动写入库的三个默认档位。后台可任意增删改。
+#: 首次启动写入库的三个内置档位。后台可任意增删改。
 DEFAULT_PLANS: list[dict] = [
     {
         "code": "free",
-        "name": "默认档",
+        "name": "免费版",
         "level": 0,
         "max_keys": 3,
         "rate_limit": 60,
         "daily_quota": 1000,
+        #: 免费档是起点，不需要兑换，也没有有效期
+        "redeem_points": None,
+        "redeem_days": 30,
         "features": [
             "实时行情快照（全市场）",
             "日/周/月 K 线",
             "3 个 API Key",
             "每分钟 60 次调用",
             "每日 1,000 次调用",
+            "无需任何条件，永久有效",
         ],
-        "description": "新用户注册即用的默认额度，适合个人开发与功能验证。",
+        "description": "注册即用的免费额度，签到之外不需要做任何事。",
         "is_public": True,
         "sort_order": 1,
     },
     {
         "code": "pro",
-        "name": "进阶档",
+        "name": "专业版",
         "level": 10,
         "max_keys": 10,
         "rate_limit": 300,
         "daily_quota": 50000,
+        "redeem_points": 15,
+        "redeem_days": 30,
         "features": [
-            "包含默认档全部能力",
+            "包含免费版全部能力",
             "龙虎榜 / 涨停池等特色数据",
             "10 个 API Key",
             "每分钟 300 次调用",
             "每日 5 万次调用",
             "优先数据源切换",
         ],
-        "description": "适合量化爱好者与小型团队的日常用量。",
+        "description": "15 积分兑换，有效期 30 天。每日签到可攒积分。",
         "is_public": True,
         "sort_order": 2,
     },
     {
         "code": "vip",
-        "name": "宽松档",
+        "name": "旗舰版",
         "level": 20,
         "max_keys": 50,
         "rate_limit": 1200,
         "daily_quota": -1,
+        "redeem_points": 30,
+        "redeem_days": 30,
         "features": [
-            "包含进阶档全部能力",
+            "包含专业版全部能力",
             "50 个 API Key",
             "每分钟 1,200 次调用",
             "每日调用不限量",
             "历史数据批量导出",
         ],
-        "description": "面向自建部署与高频场景，不限调用量。",
+        "description": "30 积分兑换，有效期 30 天。每日签到可攒积分。",
         "is_public": True,
         "sort_order": 3,
     },
@@ -87,18 +95,20 @@ DEFAULT_PLANS: list[dict] = [
 #: plans 表被清空 / 档位被删时的兜底，保证鉴权链路不会因为查不到档位而 500
 FALLBACK_PLAN: dict = {
     "code": "free",
-    "name": "默认档",
+    "name": "免费版",
     "level": 0,
     "max_keys": 3,
     "rate_limit": 60,
     "daily_quota": 1000,
+    "redeem_points": None,
+    "redeem_days": 30,
     "features": [],
     "description": "",
 }
 
 
 def seed_plans(db, plans: list[dict] | None = None) -> int:
-    """写入默认档位，已存在的跳过（不覆盖后台的自定义改动）。返回新增数量。"""
+    """写入内置档位，已存在的跳过（不覆盖后台的自定义改动）。返回新增数量。"""
     added = 0
     for p in plans or DEFAULT_PLANS:
         row = db.scalar(select(Plan).where(Plan.code == p["code"]))
@@ -108,8 +118,37 @@ def seed_plans(db, plans: list[dict] | None = None) -> int:
         added += 1
     if added:
         db.commit()
-        log.info("已初始化 %d 个默认档位", added)
+        log.info("已初始化 %d 个内置档位", added)
     return added
+
+
+def sync_builtin_plans(db) -> int:
+    """把内置档位的定义刷新到已存在的行上，但对管理员的自定义改动留手。
+
+    为什么需要它：`seed_plans()` 为了保护后台的自定义，遇到已存在的 code
+    就直接跳过 —— 结果是升级包里改了档位名 / 新增了兑换价，界面还是旧的。
+
+    判定条件用 **redeem_points IS NULL**：
+      * 老库刚升级时三档都还没这个值 → 会被刷新一次；
+      * 刷新完就有值了 → 之后再改代码也不会覆盖管理员的自定义。
+    所以这个同步对每个库只会真正生效一次。
+    """
+    by_code = {p["code"]: p for p in DEFAULT_PLANS}
+    n = 0
+    for row in db.scalars(select(Plan).where(Plan.code.in_(by_code.keys()))).all():
+        if row.redeem_points is not None:
+            continue          # 已配置过 → 管理员在管，别覆盖
+        d = by_code[row.code]
+        row.name = d["name"]
+        row.redeem_points = d["redeem_points"]
+        row.redeem_days = d["redeem_days"]
+        row.features = list(d["features"])
+        row.description = d["description"]
+        n += 1
+    if n:
+        db.commit()
+        log.info("已同步 %d 个内置档位的名称与兑换配置", n)
+    return n
 
 
 # ---------------------------------------------------------------- 缓存
@@ -135,6 +174,9 @@ def plan_to_dict(p: Plan) -> dict:
         "description": p.description or "",
         "is_public": bool(p.is_public),
         "is_active": bool(p.is_active),
+        #: None = 不可兑换（免费档 / 隐藏档）
+        "redeem_points": p.redeem_points,
+        "redeem_days": p.redeem_days or 30,
         "sort_order": p.sort_order or 0,
         "created_at": p.created_at,
         "updated_at": p.updated_at,
@@ -146,7 +188,7 @@ def get_plan_row(db, code: str) -> Plan | None:
 
 
 def get_plan(db, code: str) -> dict:
-    """按 code 取档位，查不到就回落到默认档兜底（绝不返回 None）。"""
+    """按 code 取档位，查不到就回落到内置兜底档位（绝不返回 None）。"""
     now = time.time()
     hit = _plan_cache.get(code)
     if hit and now - hit[0] < _PLAN_TTL:

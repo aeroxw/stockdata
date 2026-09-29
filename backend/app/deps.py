@@ -14,6 +14,7 @@ from app.config import settings
 from app.db import get_db
 from app.models import ApiKey, User
 from app.plans import bump_usage, check_daily_quota
+from app.points import settle_expired
 from app.ratelimit import check_rate_limit, is_blacklisted
 
 bearer = HTTPBearer(auto_error=False)
@@ -76,11 +77,19 @@ def enforce_daily_quota(db: Session, user: User | None) -> None:
 
     与「每分钟限流」互补：限流管突发，配额管总量。
 
-    注意这里没有"有效期"检查 —— 开源版不卖套餐，也就不存在到期一说，
-    额度只跟管理员指派的档位有关。
+    「有效期」由积分兑换产生：签到攒分换来的档位到期后回落到免费版，
+    但**只降档、不停服**（见下方 settle_expired）。额度不牵扯任何金额。
     """
     if user is None:
         return
+
+    #: 积分兑换来的档位到期 -> 回落到免费版，**继续服务**。
+    #: 放在鉴权链里而不是另起一个定时任务：不需要额外 cron，
+    #: 而且用户下一次调用就能立即用上新档位，不会出现
+    #: "后台显示已过期、接口还在按高档位放行"的错位。
+    #: 注意这里只降级、不拒绝 —— 配额可以变小，服务不能断。
+    settle_expired(db, user)
+
     ok, used, quota = check_daily_quota(db, user)
     if not ok:
         raise HTTPException(

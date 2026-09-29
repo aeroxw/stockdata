@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.db import init_db
 from app.models import ApiLog
-from app.routers import admin, apikey, auth, data, quota
+from app.routers import admin, apikey, auth, data, points, quota
 from app.db import SessionLocal
 
 logging.basicConfig(level=logging.INFO)
@@ -89,6 +89,7 @@ app.include_router(auth.router, prefix=API)
 app.include_router(apikey.router, prefix=API)
 app.include_router(data.router)
 app.include_router(quota.router, prefix=API)
+app.include_router(points.router, prefix=API)
 app.include_router(admin.router, prefix=API)
 
 

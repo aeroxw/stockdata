@@ -276,9 +276,9 @@
    state.plans 由 /admin/plans 填充；接口还没返回时先用内置三档兜底，
    避免下拉框空白或渲染报错。 */
 const FALLBACK_PLANS = [
-  { code: 'free', name: '默认档', level: 0, max_keys: 3, rate_limit: 60, daily_quota: 1000 },
-  { code: 'pro', name: '进阶档', level: 10, max_keys: 10, rate_limit: 300, daily_quota: 50000 },
-  { code: 'vip', name: '宽松档', level: 20, max_keys: 50, rate_limit: 1200, daily_quota: -1 },
+  { code: 'free', name: '免费版', level: 0, max_keys: 3, rate_limit: 60, daily_quota: 1000, redeem_points: null, redeem_days: 30 },
+  { code: 'pro', name: '专业版', level: 10, max_keys: 10, rate_limit: 300, daily_quota: 50000, redeem_points: 15, redeem_days: 30 },
+  { code: 'vip', name: '旗舰版', level: 20, max_keys: 50, rate_limit: 1200, daily_quota: -1, redeem_points: 30, redeem_days: 30 },
 ];
 const SRC_LABEL = {
   hithink: '同花顺', tencent: '腾讯', sina: '新浪',
@@ -682,7 +682,7 @@ function renderUsers(rows) {
   wrap.innerHTML = `<table class="table-nowrap">
     <thead><tr>
       <th>用户</th><th>档位</th><th>角色</th><th>状态</th>
-      <th>Key 用量</th><th>24h 调用</th><th>注册时间</th><th style="text-align:right">操作</th>
+      <th>积分</th><th>Key 用量</th><th>24h 调用</th><th>注册时间</th><th style="text-align:right">操作</th>
     </tr></thead>
     <tbody>${rows.map((u) => {
       const quota = u.key_quota ?? planQuota(u.tier);
@@ -697,22 +697,84 @@ function renderUsers(rows) {
           <select class="tier-select tier-${esc(u.tier)}" onchange="changeTier(${u.id}, this.value)">
             ${tierOptions(u.tier)}
           </select>
+          <div class="cell-sub">${expiryCell(u)}</div>
         </td>
         <td>${u.is_admin ? '<span class="status main">管理员</span>' : '<span class="cell-sub">普通用户</span>'}</td>
         <td>${u.is_active
           ? '<span class="status ok">正常</span>'
           : '<span class="status partial">已禁用</span>'}</td>
+        <td class="mono">${nfmt(u.points || 0)}</td>
         <td class="mono ${full ? 'txt-warn' : ''}">${u.active_keys || 0} / ${quota}</td>
         <td class="mono">${nfmt(u.calls_24h)}</td>
         <td class="cell-sub">${SD.fmtTime(u.created_at)}</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="btn btn-ghost btn-sm" onclick="viewUser(${u.id})">详情</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPointsEditor(${u.id}, '${esc(u.email)}', ${u.points || 0})">积分</button>
           <button class="btn btn-ghost btn-sm" onclick="toggleUser(${u.id}, ${u.is_active})">${u.is_active ? '禁用' : '启用'}</button>
           <button class="btn btn-ghost btn-sm" onclick="resetPwd(${u.id}, '${esc(u.email)}')">改密码</button>
           ${me ? '' : `<button class="btn btn-danger btn-sm" onclick="delUser(${u.id}, '${esc(u.email)}')">删除</button>`}
         </td>
       </tr>`;
     }).join('')}</tbody></table>`;
+}
+
+/* 档位有效期单元格：管理员要一眼看出这个用户的额度是签到兑换来的
+   （有到期日）还是后台直接指派的（长期有效），以及还剩几天。 */
+function expiryCell(u) {
+  if (!u.plan_expires_at) return '<span style="color:var(--muted)">长期有效</span>';
+  const d = String(u.plan_expires_at).slice(0, 10);
+  const left = u.plan_days_left;
+  if (left !== null && left < 0) {
+    return `<span class="status err">已到期</span>
+            <span style="color:var(--muted)"> ${d}</span>`;
+  }
+  const warn = left !== null && left <= 7;
+  return `<span class="${warn ? 'txt-warn' : ''}">剩 ${left} 天</span>
+          <span style="color:var(--muted)"> ${d}</span>`;
+}
+
+/* ---------- 调整积分 ---------- */
+function openPointsEditor(id, email, cur) {
+  openModal('调整积分', `
+    <div class="kv-list" style="margin-bottom:16px">
+      <div class="kv"><span>用户</span><b>${esc(email)}</b></div>
+      <div class="kv"><span>当前积分</span><b class="mono">${cur}</b></div>
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>变动（正数发放，负数扣减）</label>
+      <input id="ptAmt" type="number" step="1" placeholder="如 15 或 -10" autocomplete="off">
+    </div>
+    <div class="field" style="margin-bottom:18px">
+      <label>备注</label>
+      <input id="ptRemark" placeholder="如：补偿 / 活动奖励" autocomplete="off">
+    </div>
+    <div class="chips" style="margin-bottom:18px">
+      <span class="chip" onclick="document.getElementById('ptAmt').value=15">+15</span>
+      <span class="chip" onclick="document.getElementById('ptAmt').value=30">+30</span>
+      <span class="chip" onclick="document.getElementById('ptAmt').value=-15">-15</span>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="submitPoints(${id})">确认调整</button>
+    <div class="panel-note" style="margin-top:10px">
+      这只是运营补发通道，<b>不涉及任何金额</b>。积分不可购买、不可转让，
+      每一笔都会写进积分流水，用户可在控制台「流水」里看到。
+    </div>`);
+}
+
+async function submitPoints(id) {
+  const amount = parseInt(document.getElementById('ptAmt').value, 10);
+  if (!amount) { toast('请输入变动值', 'err'); return; }
+  try {
+    const r = await SD.api(`/admin/users/${id}/points`, {
+      method: 'POST',
+      body: JSON.stringify({
+        amount,
+        remark: document.getElementById('ptRemark').value.trim(),
+      }),
+    });
+    closeModal();
+    toast(r.msg || '积分已调整');
+    loadUsers();
+  } catch (e) { toast('调整失败：' + e.message, 'err'); }
 }
 
 async function changeTier(id, tier) {
@@ -1002,6 +1064,8 @@ function renderAdminPlans(rows) {
         <div><span>Key 上限</span><b class="mono">${p.max_keys}</b></div>
         <div><span>限流</span><b class="mono">${p.rate_limit}/min</b></div>
         <div><span>日配额</span><b class="mono">${p.daily_quota < 0 ? '不限' : nfmt(p.daily_quota)}</b></div>
+        <div><span>兑换价</span><b class="mono">${p.redeem_points ? p.redeem_points + ' 分' : '不可兑换'}</b></div>
+        <div><span>兑换后有效期</span><b class="mono">${p.redeem_points ? p.redeem_days + ' 天' : '—'}</b></div>
         <div><span>在用用户</span><b class="mono">${nfmt(p.users || 0)}</b></div>
       </div>
       ${(p.features || []).length
@@ -1024,6 +1088,7 @@ function openPlanEditor(code) {
   const v = p || {
     code: '', name: '', level: 0,
     max_keys: 3, rate_limit: 60, daily_quota: 1000, description: '',
+    redeem_points: null, redeem_days: 30,
     features: [], is_public: true, is_active: true, sort_order: 99,
   };
   openModal(p ? `编辑档位 · ${p.name}` : '新建档位', `
@@ -1038,6 +1103,12 @@ function openPlanEditor(code) {
     <div class="form-row" style="margin-top:12px">
       <div class="field"><label>排序</label>
         <input id="plSort" type="number" value="${v.sort_order}" autocomplete="off"></div>
+      <div class="field"><label>兑换价（积分，留空或 0 = 不可兑换）</label>
+        <input id="plRedeem" type="number" min="0"
+          value="${v.redeem_points == null ? '' : v.redeem_points}" autocomplete="off"></div>
+      <div class="field"><label>兑换后有效期（天）</label>
+        <input id="plRedeemDays" type="number" min="1"
+          value="${v.redeem_days}" autocomplete="off"></div>
     </div>
     <div class="form-row" style="margin-top:12px">
       <div class="field"><label>API Key 上限</label>
@@ -1075,6 +1146,14 @@ async function submitPlan(code) {
     max_keys: parseInt(document.getElementById('plKeys').value) || 3,
     rate_limit: parseInt(document.getElementById('plRate').value) || 60,
     daily_quota: parseInt(document.getElementById('plQuota').value),
+    // 留空 -> null（不可兑换），填了就是积分数
+    redeem_points: (() => {
+      const s = String(document.getElementById('plRedeem').value).trim();
+      if (s === '') return null;
+      const n = parseInt(s, 10);
+      return isNaN(n) || n <= 0 ? null : n;
+    })(),
+    redeem_days: parseInt(document.getElementById('plRedeemDays').value) || 30,
     sort_order: parseInt(document.getElementById('plSort').value) || 0,
     features: document.getElementById('plFeats').value.split('\n').map((s) => s.trim()).filter(Boolean),
     description: document.getElementById('plDesc').value.trim(),

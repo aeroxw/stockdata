@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
@@ -34,8 +34,61 @@ class User(Base):
     #: 管理员后台权限
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # ---------------------------------------------------------------- 积分
+    #: 当前可用积分。
+    #:
+    #: ⚠️ 合规红线 —— 改动前务必读懂：
+    #:   积分**只能通过每日签到获得**，系统里不存在任何"花钱买积分"的入口，
+    #:   也不能在用户之间转让、赠送、交易。
+    #:   理由是：一旦积分能用钱买到，它就有了财产价值，用它兑换额度等同
+    #:   于变相售卖，整套机制的法律性质会从"无偿的运营手段"变成
+    #:   "有偿互联网信息服务" —— 那是要 ICP 许可证的（见 MEMORY.md 的合规结论）。
+    #:   现在的做法是让它**只代表用户的耐心**，不代表钱。
+    #:   这同时也是它比"付费套餐"更适合本项目的原因：配额限制的目的是
+    #:   挡住注册完就拿脚本刷爆六家数据源的人，而不是赚钱。
+    points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: 累计获得的积分（只增不减）。展示用，让用户看到自己的长期积累。
+    points_earned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: 上次签到的自然日（Asia/Shanghai）。单独存日期而非时间戳，
+    #: 因为"每天一次"的粒度就是自然日 —— 存时间戳还得时区换算。
+    last_checkin_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    #: 兑换来的档位到期时间。NULL = 永不过期（免费版，或管理员手动指派）。
+    #:
+    #: 到期后的处理是**回落到免费版继续服务**，而不是停用账号/拒绝调用。
+    #: 这一点是刻意设计的：一旦变成"不给兑换就停服"，性质就接近付费墙了。
+    plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class PointLog(Base):
+    """积分流水。
+
+    每一笔积分变动都要留痕：签到获得、兑换消耗、管理员调整。
+    用途有两个 —— 用户侧能查自己的账，管理员侧出问题时能追溯。
+
+    注意这里是**审计留痕**，不是财务流水：不涉及任何金额，所以没有
+    结算、对账、退款这些概念。
+    """
+
+    __tablename__ = "point_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    #: checkin 签到 / redeem 兑换 / grant 管理员发放 / deduct 管理员扣减
+    type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    #: 变动值，正=增加，负=消耗
+    delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: 变动后的可用积分余额
+    balance_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: 兑换时目标档位（其余类型留空）
+    plan_code: Mapped[str | None] = mapped_column(String(32))
+    #: 兑换时顺延到的到期时间（其余类型留空）
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    remark: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
 class ApiKey(Base):
@@ -170,6 +223,13 @@ class Plan(Base):
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     #: 停用后不允许再指派给新用户
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: 签到积分兑换这个档位需要的积分数。NULL 或 0 = 不可兑换。
+    #:
+    #: 放在 plans 表里而不是写死在代码里，是为了后台能随时调整 ——
+    #: 改完立即生效，不用重新部署。
+    redeem_points: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: 兑换后档位的有效天数。到期自动回落到免费版（继续服务，不停用）。
+    redeem_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

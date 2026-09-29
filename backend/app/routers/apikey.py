@@ -52,8 +52,8 @@ def create_key(payload: ApiKeyCreate, db: Session = Depends(get_db),
     if existing >= max_keys:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            f"当前套餐（{plan['name']}）最多创建 {max_keys} 个 API Key，"
-            f"如需更多请升级套餐",
+            f"当前档位（{plan['name']}）最多创建 {max_keys} 个 API Key，"
+            f"如需更多请签到攒积分兑换更高档位，或联系管理员调整",
         )
 
     raw, kh, prefix = generate_api_key()
