@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockData — 多源金融数据整合平台 | 通达信·同花顺·开盘了·东方财富·新浪·腾讯</title>
+<meta name="description" content="StockData 聚合通达信、同花顺、开盘了、东方财富、新浪、腾讯六大数据源，提供统一的 A 股行情、K线、涨停池、龙虎榜 REST API，支持 API Key 自助管理与多源交叉校验。">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ===================== 导航 ===================== -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <div class="logo">
+      <div class="logo-mark">S</div>
+      <div>StockData <span>金融数据平台</span></div>
+    </div>
+    <div class="nav-links">
+      <a href="#market">市场概览</a>
+      <a href="#sources">数据源</a>
+      <a href="#architecture">架构</a>
+      <a href="#features">核心能力</a>
+      <a href="#playground">在线调试</a>
+      <a href="#pricing">套餐</a>
+      <a href="/docs.html">开发文档</a>
+    </div>
+    <div class="nav-actions" id="navActions">
+      <a class="btn btn-ghost btn-sm" href="/login.html">登录</a>
+      <a class="btn btn-primary btn-sm" href="/login.html?tab=register">免费注册</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===================== Hero ===================== -->
+<header class="hero">
+  <div class="container hero-inner">
+    <div class="badge">
+      <span class="dot"></span>
+      六大数据源已全部接入 · 全市场 5500+ 标的实时聚合
+    </div>
+
+    <h1 class="hero-title">
+      一个 API，<br>
+      <span class="gradient-text">汇通六大金融数据源</span>
+    </h1>
+
+    <p class="hero-sub">
+      通达信、同花顺、开盘了、东方财富、新浪、腾讯 —— 六家数据差异全部收敛为统一模型。
+      多源交叉校验、主备自动切换，让你专注策略而非数据清洗。
+    </p>
+
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="/login.html?tab=register">免费获取 API Key →</a>
+      <a class="btn btn-ghost" href="#playground">先试一下真实接口</a>
+    </div>
+
+    <!-- 平台指标 -->
+    <div class="metric-band">
+      <div class="metric-cell">
+        <div class="metric-label">接入数据源</div>
+        <div class="metric-value">6 <small>家</small></div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">覆盖标的</div>
+        <div class="metric-value" id="mTotal">—</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">标准接口</div>
+        <div class="metric-value">94 <small>个端点</small></div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">快照刷新</div>
+        <div class="metric-value">3 <small>秒</small></div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-label">主备切换</div>
+        <div class="metric-value">自动</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== 市场概览（真实数据） ===================== -->
+<section class="section" id="market">
+  <div class="container">
+    <div class="market-head">
+      <div>
+        <div class="section-tag" style="text-align:left">Live Market</div>
+        <h2 class="section-title" style="text-align:left;margin-bottom:6px">市场概览</h2>
+        <div class="live-badge">
+          <span class="live-dot"></span>
+          <span id="mUpdatedAt">正在加载实时数据…</span>
+        </div>
+      </div>
+      <button class="btn-refresh" id="btnRefresh">⟳ 刷新</button>
+    </div>
+
+    <!-- 指数 -->
+    <div class="index-row" id="indexRow">
+      <div class="index-card"><div class="index-name">加载中…</div></div>
+      <div class="index-card"><div class="index-name">加载中…</div></div>
+      <div class="index-card"><div class="index-name">加载中…</div></div>
+      <div class="index-card"><div class="index-name">加载中…</div></div>
+    </div>
+
+    <!-- 涨跌分布 -->
+    <div class="breadth-panel">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap">
+        <div style="font-size:15px;font-weight:700">全市场涨跌分布</div>
+        <div style="font-size:12.5px;color:var(--muted)" id="breadthHint">同花顺一次请求回全市场快照</div>
+      </div>
+
+      <div class="breadth-bar">
+        <span class="breadth-up"   id="barUp"   style="width:0%"></span>
+        <span class="breadth-flat" id="barFlat" style="width:0%"></span>
+        <span class="breadth-down" id="barDown" style="width:0%"></span>
+      </div>
+
+      <div class="breadth-stats">
+        <div>
+          <div class="bstat-label">上涨</div>
+          <div class="bstat-value up" id="bUp">—</div>
+        </div>
+        <div>
+          <div class="bstat-label">下跌</div>
+          <div class="bstat-value down" id="bDown">—</div>
+        </div>
+        <div>
+          <div class="bstat-label">平盘</div>
+          <div class="bstat-value flat" id="bFlat">—</div>
+        </div>
+        <div>
+          <div class="bstat-label">涨停 / 跌停</div>
+          <div class="bstat-value"><span class="up" id="bLU">—</span> <span style="color:var(--muted)">/</span> <span class="down" id="bLD">—</span></div>
+        </div>
+        <div>
+          <div class="bstat-label">平均涨幅</div>
+          <div class="bstat-value" id="bAvg">—</div>
+        </div>
+        <div>
+          <div class="bstat-label">上涨占比</div>
+          <div class="bstat-value" id="bRatio">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 领涨 / 领跌 -->
+    <div class="mover-grid">
+      <div class="mover-panel">
+        <div class="mover-title"><span style="color:var(--up)">▲</span> 领涨榜</div>
+        <div id="gainerList"><div class="mover-row">加载中…</div></div>
+      </div>
+      <div class="mover-panel">
+        <div class="mover-title"><span style="color:var(--down)">▼</span> 领跌榜</div>
+        <div id="loserList"><div class="mover-row">加载中…</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 数据源 ===================== -->
+<section class="section section-alt" id="sources">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Data Sources</div>
+      <h2 class="section-title">六大数据源，各取所长</h2>
+      <p class="section-desc">
+        不是简单地"都接上"，而是按各家实测能力分配角色：谁批量快就让谁跑全量，谁字段全就让谁做主干。
+      </p>
+    </div>
+
+    <div class="source-grid">
+      <div class="source-card">
+        <div class="source-head">
+          <div class="source-name">
+            <div class="source-logo" style="background:linear-gradient(135deg,#3d7dff,#22d3ee)">同</div>
+            同花顺
+          </div>
+          <span class="status main">主力源</span>
+        </div>
+        <div class="source-desc">
+          一次请求返回全市场 5578 只快照，94 个 REST 端点覆盖财报、估值、复权因子与全部特色数据。
+        </div>
+        <div class="source-tags">
+          <span class="tag">全市场快照</span><span class="tag">涨停池</span>
+          <span class="tag">龙虎榜</span><span class="tag">财报</span><span class="tag">估值</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-head">
+          <div class="source-name">
+            <div class="source-logo" style="background:linear-gradient(135deg,#16c784,#0ea472)">腾</div>
+            腾讯行情
+          </div>
+          <span class="status ok">高频源</span>
+        </div>
+        <div class="source-desc">
+          盘中高频快照主源，含五档盘口、换手率、量比、流通市值。批量 50 只/次，并发友好。
+        </div>
+        <div class="source-tags">
+          <span class="tag">实时快照</span><span class="tag">五档盘口</span>
+          <span class="tag">换手率</span><span class="tag">量比</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-head">
+          <div class="source-name">
+            <div class="source-logo" style="background:linear-gradient(135deg,#f0b90b,#f97316)">东</div>
+            东方财富
+          </div>
+          <span class="status ok">主干源</span>
+        </div>
+        <div class="source-desc">
+          字段最全的实时快照，独家提供复权因子，是计算前/后复权 K 线的必备来源。
+        </div>
+        <div class="source-tags">
+          <span class="tag">实时快照</span><span class="tag">复权因子</span>
+          <span class="tag">日/周/月K</span><span class="tag">资金流</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-head">
+          <div class="source-name">
+            <div class="source-logo" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">通</div>
+            通达信
+          </div>
+          <span class="status main">K线主力</span>
+        </div>
+        <div class="source-desc">
+          全市场历史 K 线的最优路径：约 28 请求/秒，全市场 5500+ 只仅需约 230 秒，稳定不丢。
+        </div>
+        <div class="source-tags">
+          <span class="tag">全市场日K</span><span class="tag">分钟K</span>
+          <span class="tag">前/后复权</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-head">
+          <div class="source-name">
+            <div class="source-logo" style="background:linear-gradient(135deg,#f0453a,#dc2626)">新</div>
+            新浪财经
+          </div>
+          <span class="status ok">备用源</span>
+        </div>
+        <div class="source-desc">
+          独立链路的备用快照源，含五档盘口。主源异常时自动降级，保证服务不中断。
+        </div>
+        <div class="source-tags">
+          <span class="tag">实时快照</span><span class="tag">五档盘口</span><span class="tag">容灾备份</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-head">
+          <div class="source-name">
+            <div class="source-logo" style="background:linear-gradient(135deg,#ec4899,#8b5cf6)">开</div>
+            开盘了
+          </div>
+          <span class="status ok">补充源</span>
+        </div>
+        <div class="source-desc">
+          龙虎榜提供游资席位与净买入明细，与同花顺双源交叉校验，提升情绪数据可信度。
+        </div>
+        <div class="source-tags">
+          <span class="tag">龙虎榜</span><span class="tag">净买入</span>
+          <span class="tag">游资席位</span><span class="tag">交叉校验</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 架构 ===================== -->
+<section class="section" id="architecture">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Architecture</div>
+      <h2 class="section-title">数据是怎么到你手上的</h2>
+      <p class="section-desc">
+        采集、归一化、校验、缓存、鉴权分层解耦。任何一层出问题都不会把风险传导到你的调用端。
+      </p>
+    </div>
+
+    <div class="arch">
+      <div class="arch-col">
+        <div class="arch-col-title">数据源</div>
+        <div class="arch-box"><strong>同花顺</strong><em>全市场快照</em></div>
+        <div class="arch-box"><strong>腾讯</strong><em>高频快照</em></div>
+        <div class="arch-box"><strong>东方财富</strong><em>复权因子</em></div>
+        <div class="arch-box"><strong>通达信</strong><em>历史 K 线</em></div>
+        <div class="arch-box"><strong>新浪</strong><em>容灾备份</em></div>
+        <div class="arch-box"><strong>开盘了</strong><em>龙虎榜</em></div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-col">
+        <div class="arch-col-title">适配层</div>
+        <div class="arch-box hl" style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px">
+          <strong>统一适配</strong>
+          <em>GBK 分隔串 / f43 编码 / REST 信封<br>→ 统一 Quote · KlineBar</em>
+        </div>
+        <div class="arch-box"><strong>优先级链</strong><em>超时即降级下一源</em></div>
+        <div class="arch-box"><strong>交叉校验</strong><em>偏差超阈值告警</em></div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-col">
+        <div class="arch-col-title">服务层</div>
+        <div class="arch-box"><strong>Redis 缓存</strong><em>快照 3s / K线 5min</em></div>
+        <div class="arch-box"><strong>滑动限流</strong><em>按 Key 每分钟</em></div>
+        <div class="arch-box"><strong>API Key 鉴权</strong><em>哈希校验 + 黑名单</em></div>
+        <div class="arch-box"><strong>调用日志</strong><em>路径 / 耗时 / 状态码</em></div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-col">
+        <div class="arch-col-title">统一出口</div>
+        <div class="arch-box hl" style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px">
+          <strong>REST API</strong>
+          <em>统一信封<br>{code, msg, data, meta}</em>
+        </div>
+        <div class="arch-box"><strong>PostgreSQL</strong><em>历史落库</em></div>
+      </div>
+
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-col">
+        <div class="arch-col-title">你的应用</div>
+        <div class="arch-box hl" style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px">
+          <strong>量化 / 回测</strong>
+          <em>一份 SDK<br>六源冗余</em>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 核心能力 ===================== -->
+<section class="section section-alt" id="features">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Capabilities</div>
+      <h2 class="section-title">不只是数据搬运</h2>
+      <p class="section-desc">
+        六家接口格式天差地别 —— GBK 的波浪号分隔串、JSON 里的 f43/f44 编码字段、REST 信封……
+        全部收敛后再交付给你。
+      </p>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔀</div>
+        <div class="feature-title">统一数据模型</div>
+        <div class="feature-desc">
+          所有数据源输出同一个 Quote / KlineBar 结构，字段命名与单位统一（成交量统一为股、成交额统一为元）。
+          切换数据源不改一行业务代码。
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <div class="feature-title">主备自动切换</div>
+        <div class="feature-desc">
+          按优先级链式取数，某源超时或异常自动降级到下一源，接口层完全无感。
+          交易时段感知，非交易时段自动停采避免触发风控。
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚖️</div>
+        <div class="feature-title">多源交叉校验</div>
+        <div class="feature-desc">
+          同一标的多源比对价格，偏差超阈值即告警。数据质量是这类平台的生命线，
+          我们不把"拿到数据"当成"拿到正确的数据"。
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔑</div>
+        <div class="feature-title">API Key 自助管理</div>
+        <div class="feature-desc">
+          自助创建、命名、设权限范围与过期时间，支持一键轮换与即时吊销。
+          数据库只存哈希，明文密钥仅创建时展示一次。
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">分层缓存与限流</div>
+        <div class="feature-desc">
+          Redis 缓存盘中快照（3 秒）与 K 线（5 分钟），按 Key 滑动窗口限流，
+          超额返回 429 与 Retry-After，绝不静默丢请求。
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">调用可观测</div>
+        <div class="feature-desc">
+          每次调用落库记录路径、状态码、耗时，后台提供按用户/按接口/按时间维度的统计大盘与用量查询。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 在线调试 ===================== -->
+<section class="section" id="playground">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Playground</div>
+      <h2 class="section-title">在线调试，真实返回</h2>
+      <p class="section-desc">
+        不填 API Key 可查询演示标的；填入自己的 Key 即可查询任意代码。
+      </p>
+    </div>
+
+    <div class="playground">
+      <div class="pg-bar">
+        <input class="pg-input" id="pgCodes" value="600519.SH,000001.SH,300750.SZ"
+               placeholder="股票代码，逗号分隔">
+        <input class="pg-input" id="pgKey" placeholder="API Key（可选，sk_live_…）" style="flex:0 1 280px">
+        <button class="btn btn-primary" id="pgRun">发送请求</button>
+      </div>
+      <pre class="pg-out" id="pgOut">点击「发送请求」查看真实响应…</pre>
+      <div class="pg-meta" id="pgMeta"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 代码示例 ===================== -->
+<section class="section section-alt" id="api">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Quick Start</div>
+      <h2 class="section-title">三步接入，一次调用</h2>
+      <p class="section-desc">注册 → 创建 API Key → 发起请求。响应是统一信封，业务数据永远在 data 里。</p>
+    </div>
+
+    <div class="code-tabs">
+      <button class="code-tab active" data-tab="py">Python</button>
+      <button class="code-tab" data-tab="js">JavaScript</button>
+      <button class="code-tab" data-tab="curl">cURL</button>
+      <button class="code-tab" data-tab="json">响应 JSON</button>
+    </div>
+
+    <div class="code-panel active" data-panel="py">
+      <div class="code-block">
+        <div class="code-head">
+          <span class="code-dot" style="background:#ff5f56"></span>
+          <span class="code-dot" style="background:#ffbd2e"></span>
+          <span class="code-dot" style="background:#27c93f"></span>
+          <span class="code-lang">Python</span>
+        </div>
+        <div class="code-body"><span class="k">import</span> requests
+
+BASE   = <span class="s">"http://&lt;你的域名&gt;:9850/api/v1"</span>
+HEADERS = {<span class="s">"Authorization"</span>: <span class="s">"Bearer sk_live_xxx"</span>}
+
+<span class="c"># 1) 实时行情 —— 支持一次多只</span>
+r = requests.<span class="f">get</span>(<span class="s">f"{BASE}/quote"</span>, headers=HEADERS,
+              params={<span class="s">"codes"</span>: <span class="s">"600519.SH,000001.SZ,300750.SZ"</span>})
+<span class="f">print</span>(r.<span class="f">json</span>()[<span class="s">"data"</span>])
+
+<span class="c"># 2) 历史 K 线 —— 前复权日线</span>
+k = requests.<span class="f">get</span>(<span class="s">f"{BASE}/kline"</span>, headers=HEADERS,
+              params={<span class="s">"code"</span>: <span class="s">"600519.SH"</span>, <span class="s">"period"</span>: <span class="s">"day"</span>,
+                      <span class="s">"limit"</span>: <span class="k">100</span>, <span class="s">"adjust"</span>: <span class="s">"qfq"</span>})
+
+<span class="c"># 3) 特色数据 —— 涨停池 / 龙虎榜</span>
+s = requests.<span class="f">get</span>(<span class="s">f"{BASE}/special/limit_up"</span>, headers=HEADERS)</div>
+      </div>
+    </div>
+
+    <div class="code-panel" data-panel="js">
+      <div class="code-block">
+        <div class="code-head">
+          <span class="code-dot" style="background:#ff5f56"></span>
+          <span class="code-dot" style="background:#ffbd2e"></span>
+          <span class="code-dot" style="background:#27c93f"></span>
+          <span class="code-lang">JavaScript</span>
+        </div>
+        <div class="code-body"><span class="k">const</span> BASE = <span class="s">"http://&lt;你的域名&gt;:9850/api/v1"</span>;
+<span class="k">const</span> HEADERS = { <span class="s">"X-API-Key"</span>: <span class="s">"sk_live_xxx"</span> };
+
+<span class="c">// 实时行情</span>
+<span class="k">const</span> res = <span class="k">await</span> <span class="f">fetch</span>(
+  <span class="s">`${BASE}/quote?codes=600519.SH,000001.SH`</span>,
+  { headers: HEADERS }
+);
+<span class="k">const</span> { data, meta } = <span class="k">await</span> res.<span class="f">json</span>();
+<span class="f">console</span>.<span class="f">log</span>(<span class="s">`数据来自: ${meta.source}`</span>, data);
+
+<span class="c">// 龙虎榜（可指定开盘了源做交叉校验）</span>
+<span class="k">const</span> lhb = <span class="k">await</span> <span class="f">fetch</span>(
+  <span class="s">`${BASE}/special/dragon_tiger?source=kaipanla`</span>,
+  { headers: HEADERS }
+);</div>
+      </div>
+    </div>
+
+    <div class="code-panel" data-panel="curl">
+      <div class="code-block">
+        <div class="code-head">
+          <span class="code-dot" style="background:#ff5f56"></span>
+          <span class="code-dot" style="background:#ffbd2e"></span>
+          <span class="code-dot" style="background:#27c93f"></span>
+          <span class="code-lang">cURL</span>
+        </div>
+        <div class="code-body"><span class="c"># 行情快照（三种传 Key 方式任选其一）</span>
+curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/quote?codes=600519.SH"</span> \
+  -H <span class="s">"Authorization: Bearer sk_live_xxx"</span>
+
+curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/quote?codes=600519.SH"</span> \
+  -H <span class="s">"X-API-Key: sk_live_xxx"</span>
+
+<span class="c"># 涨停池</span>
+curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/special/limit_up"</span> \
+  -H <span class="s">"Authorization: Bearer sk_live_xxx"</span>
+
+<span class="c"># 前复权日线</span>
+curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/kline?code=600519.SH&amp;period=day&amp;limit=100&amp;adjust=qfq"</span> \
+  -H <span class="s">"Authorization: Bearer sk_live_xxx"</span></div>
+      </div>
+    </div>
+
+    <div class="code-panel" data-panel="json">
+      <div class="code-block">
+        <div class="code-head">
+          <span class="code-dot" style="background:#ff5f56"></span>
+          <span class="code-dot" style="background:#ffbd2e"></span>
+          <span class="code-dot" style="background:#27c93f"></span>
+          <span class="code-lang">响应 JSON</span>
+        </div>
+        <div class="code-body">{
+  <span class="n">"code"</span>: <span class="k">0</span>,
+  <span class="n">"msg"</span>: <span class="s">"ok"</span>,
+  <span class="n">"data"</span>: [{
+    <span class="n">"code"</span>: <span class="s">"600519.SH"</span>,
+    <span class="n">"name"</span>: <span class="s">"贵州茅台"</span>,
+    <span class="n">"price"</span>: <span class="k">1243.88</span>,
+    <span class="n">"pre_close"</span>: <span class="k">1236.94</span>,
+    <span class="n">"open"</span>: <span class="k">1236.0</span>,
+    <span class="n">"high"</span>: <span class="k">1244.01</span>,
+    <span class="n">"low"</span>: <span class="k">1228.1</span>,
+    <span class="n">"change"</span>: <span class="k">6.94</span>,
+    <span class="n">"change_pct"</span>: <span class="k">0.56</span>,
+    <span class="n">"volume"</span>: <span class="k">2843100</span>,
+    <span class="n">"amount"</span>: <span class="k">3521408800.0</span>,
+    <span class="n">"turnover_rate"</span>: <span class="k">0.23</span>,
+    <span class="n">"vol_ratio"</span>: <span class="k">1.08</span>,
+    <span class="n">"circ_mv"</span>: <span class="k">15620.5</span>,
+    <span class="n">"ts"</span>: <span class="s">"2026-09-28T14:31:02"</span>
+  }],
+  <span class="n">"meta"</span>: {
+    <span class="n">"source"</span>: <span class="s">"tencent"</span>,
+    <span class="n">"cached"</span>: <span class="k">false</span>,
+    <span class="n">"ts"</span>: <span class="s">"2026-09-28T14:31:02.118"</span>
+  }
+}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 对比 ===================== -->
+<section class="section" id="compare">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Why StockData</div>
+      <h2 class="section-title">和直接对接单一数据源的区别</h2>
+      <p class="section-desc">自建采集最贵的地方从来不是写代码，而是长期的运维与容错。</p>
+    </div>
+
+    <div class="compare-wrap table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:26%">能力</th>
+            <th style="width:37%">直连单一数据源</th>
+            <th style="width:37%">StockData 统一接入</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>接入成本</td>
+            <td><span class="compare-no">每家一套解析逻辑</span>，GBK / 编码字段 / 信封各不相同</td>
+            <td><span class="compare-yes">一套接口</span>，六种协议差异已在适配层消化</td>
+          </tr>
+          <tr>
+            <td>服务可用性</td>
+            <td><span class="compare-no">单源故障即中断</span>，需自己写降级</td>
+            <td><span class="compare-yes">六源优先级链</span>，超时自动切换下一源</td>
+          </tr>
+          <tr>
+            <td>数据正确性</td>
+            <td><span class="compare-no">无法自证</span>，错了也不知道</td>
+            <td><span class="compare-yes">多源交叉校验</span>，偏差超阈值告警</td>
+          </tr>
+          <tr>
+            <td>缓存与限流</td>
+            <td><span class="compare-no">全部自建</span>，否则容易被封 IP</td>
+            <td><span class="compare-yes">内置</span>分层缓存 + 按 Key 滑动窗口限流</td>
+          </tr>
+          <tr>
+            <td>密钥与配额</td>
+            <td><span class="compare-no">无</span></td>
+            <td><span class="compare-yes">控制台自助</span>创建/轮换/吊销，按套餐配额</td>
+          </tr>
+          <tr>
+            <td>特色数据</td>
+            <td><span class="compare-no">分散在各家</span>，字段口径不一</td>
+            <td><span class="compare-yes">统一出口</span>，龙虎榜双源可交叉比对</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 套餐 ===================== -->
+<section class="section section-alt" id="pricing">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Pricing</div>
+      <h2 class="section-title">按需选择，随时升级</h2>
+      <p class="section-desc">从个人研究到团队生产，都有合适的配额。</p>
+    </div>
+
+    <div class="price-grid">
+      <div class="price-card">
+        <div class="price-name">Free</div>
+        <div class="price-val">¥0 <small>/ 月</small></div>
+        <div class="price-note">个人学习与策略验证</div>
+        <ul class="price-list">
+          <li>60 次 / 分钟</li>
+          <li>3 个 API Key</li>
+          <li>行情快照 + 日 K 线</li>
+          <li>社区支持</li>
+        </ul>
+        <a class="btn btn-ghost" href="/login.html?tab=register">免费开始</a>
+      </div>
+
+      <div class="price-card featured">
+        <div class="price-badge">最受欢迎</div>
+        <div class="price-name">Pro</div>
+        <div class="price-val">¥199 <small>/ 月</small></div>
+        <div class="price-note">量化研究者与小型团队</div>
+        <ul class="price-list">
+          <li>600 次 / 分钟</li>
+          <li>10 个 API Key</li>
+          <li>全部特色数据（涨停池/龙虎榜）</li>
+          <li>财报 + 估值数据</li>
+          <li>多源交叉校验</li>
+        </ul>
+        <a class="btn btn-primary" href="/login.html?tab=register">立即升级</a>
+      </div>
+
+      <div class="price-card">
+        <div class="price-name">VIP</div>
+        <div class="price-val">定制 <small>/ 年</small></div>
+        <div class="price-note">机构级生产环境</div>
+        <ul class="price-list">
+          <li>不限频次（协商）</li>
+          <li>50 个 API Key</li>
+          <li>专属数据源通道</li>
+          <li>WebSocket 实时推送</li>
+          <li>1v1 技术支持</li>
+        </ul>
+        <a class="btn btn-ghost" href="/login.html?tab=register">联系我们</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 合规提示 ===================== -->
+<section class="section" style="padding:52px 0">
+  <div class="container">
+    <div class="alert alert-info" style="margin:0">
+      <span>⚠️</span>
+      <div>
+        <strong>数据用途声明：</strong>本站数据均来自公开渠道，仅用于技术研究、策略回测与学习用途。
+        请勿用于任何商业转售或未经授权的分发；行情数据存在延迟与误差可能，不构成任何投资建议。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 页脚 ===================== -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:14px">
+          <div class="logo-mark">S</div>
+          <div>StockData</div>
+        </div>
+        <p style="color:var(--muted);font-size:14px;max-width:320px">
+          聚合六大金融数据源，提供统一、可靠、可观测的 A 股数据 API 服务。
+        </p>
+      </div>
+      <div>
+        <div class="footer-title">产品</div>
+        <ul class="footer-links">
+          <li><a href="#market">市场概览</a></li>
+          <li><a href="#sources">数据源</a></li>
+          <li><a href="#api">接口示例</a></li>
+          <li><a href="#pricing">套餐定价</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-title">开发者</div>
+        <ul class="footer-links">
+          <li><a href="/docs.html">快速开始</a></li>
+          <li><a href="/console.html">控制台</a></li>
+          <li><a href="/api/docs">OpenAPI</a></li>
+          <li><a href="/api/v1/sources">数据源状态</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-title">关于</div>
+        <ul class="footer-links">
+          <li><a href="#">服务条款</a></li>
+          <li><a href="#">数据合规声明</a></li>
+          <li><a href="#">隐私政策</a></li>
+          <li><a href="#">联系我们</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>© 2026 StockData · 数据仅供技术研究与学习用途</div>
+      <div>行情数据来自公开渠道，本站不对数据准确性作担保，不构成任何投资建议</div>
+    </div>
+  </div>
+</footer>
+
+<script src="/static/app.js"></script>
+<script>
+/* ============================================================
+   首页交互
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const cls = (v) => (v > 0 ? 'up' : (v < 0 ? 'down' : 'flat'));
+const sign = (v) => (v > 0 ? '+' : '');
+const fmt = (v, d = 2) => (v == null ? '--' : Number(v).toFixed(d));
+
+/* ---------- 导航滚动 ---------- */
+window.addEventListener('scroll', () => {
+  $('nav').classList.toggle('scrolled', window.scrollY > 20);
+});
+
+/* ---------- 登录态 ---------- */
+(function () {
+  if (localStorage.getItem('sd_token')) {
+    $('navActions').innerHTML =
+      '<a class="btn btn-primary btn-sm" href="/console.html">我的控制台</a>';
+  }
+})();
+
+/* ---------- 市场概览 ---------- */
+async function loadMarket() {
+  const btn = $('btnRefresh');
+  btn.classList.add('loading');
+  try {
+    const res = await fetch('/api/v1/public/market');
+    const json = await res.json();
+    const d = json.data || {};
+    renderIndices(d.indices || []);
+    renderBreadth(d.breadth || {});
+    renderMovers('gainerList', d.top_gainers || []);
+    renderMovers('loserList', d.top_losers || []);
+    $('mUpdatedAt').textContent =
+      '实时数据 · 更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  } catch (e) {
+    $('mUpdatedAt').textContent = '行情暂时不可用，请稍后重试';
+  } finally {
+    btn.classList.remove('loading');
+  }
+}
+
+function renderIndices(list) {
+  if (!list.length) return;
+  $('indexRow').innerHTML = list.map(i => {
+    const c = cls(i.change_pct);
+    return `<div class="index-card ${c}">
+      <div class="index-name">
+        <span>${i.name}</span>
+        <span class="index-code">${i.code}</span>
+      </div>
+      <div class="index-price ${c}">${fmt(i.price)}</div>
+      <div class="index-chg ${c}">${sign(i.change_pct)}${fmt(i.change_pct)}%
+        <span style="color:var(--muted);font-weight:400"> ${sign(i.change || 0)}${fmt(i.change)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderBreadth(b) {
+  if (!b.total) return;
+  $('mTotal').innerHTML = b.total.toLocaleString() + ' <small>只</small>';
+
+  const total = b.total || 1;
+  $('barUp').style.width = (b.up / total * 100) + '%';
+  $('barFlat').style.width = (b.flat / total * 100) + '%';
+  $('barDown').style.width = (b.down / total * 100) + '%';
+
+  $('bUp').textContent = b.up;
+  $('bDown').textContent = b.down;
+  $('bFlat').textContent = b.flat;
+  $('bLU').textContent = b.limit_up;
+  $('bLD').textContent = b.limit_down;
+  $('bAvg').innerHTML = `<span class="${cls(b.avg_pct)}">${sign(b.avg_pct)}${fmt(b.avg_pct)}%</span>`;
+  $('bRatio').innerHTML = `<span class="${b.up_ratio >= 50 ? 'up' : 'down'}">${fmt(b.up_ratio, 1)}%</span>`;
+}
+
+function renderMovers(id, list) {
+  if (!list.length) { $(id).innerHTML = '<div class="mover-row">暂无数据</div>'; return; }
+  $(id).innerHTML = list.map((m, i) => `
+    <div class="mover-row">
+      <span class="mover-rank">${i + 1}</span>
+      <span class="mover-name">${m.name || m.code}</span>
+      <span class="mover-code">${fmt(m.price)}</span>
+      <span class="mover-pct ${cls(m.change_pct)}">${sign(m.change_pct)}${fmt(m.change_pct)}%</span>
+    </div>`).join('');
+}
+
+$('btnRefresh').addEventListener('click', loadMarket);
+loadMarket();
+setInterval(loadMarket, 60000);   // 每分钟自动刷新
+
+/* ---------- 代码标签页 ---------- */
+document.querySelectorAll('.code-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.code-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+/* ---------- 在线调试 ---------- */
+async function runPlayground() {
+  const codes = $('pgCodes').value.trim();
+  const key = $('pgKey').value.trim();
+  const out = $('pgOut'), meta = $('pgMeta');
+  out.textContent = '请求中…';
+  meta.textContent = '';
+
+  try {
+    const headers = {};
+    if (key) headers['X-API-Key'] = key;
+
+    // 有 Key 走完整接口，没 Key 走公开演示接口
+    const url = key
+      ? '/api/v1/quote?codes=' + encodeURIComponent(codes)
+      : '/api/v1/public/quote';
+
+    const t0 = performance.now();
+    const res = await fetch(url, { headers });
+    const json = await res.json();
+    const ms = Math.round(performance.now() - t0);
+
+    out.textContent = JSON.stringify(json, null, 2);
+    meta.innerHTML = [
+      `HTTP ${res.status}`,
+      `耗时 ${ms}ms`,
+      `数据源 ${(json.meta || {}).source || '-'}`,
+      `缓存 ${(json.meta || {}).cached ? '命中' : '未命中'}`,
+      key ? '' : '（未填 Key，返回演示标的）'
+    ].filter(Boolean).join('　·　');
+  } catch (e) {
+    out.textContent = '请求失败: ' + e.message;
+  }
+}
+$('pgRun').addEventListener('click', runPlayground);
+$('pgCodes').addEventListener('keydown', e => { if (e.key === 'Enter') runPlayground(); });
+</script>
+</body>
+</html>

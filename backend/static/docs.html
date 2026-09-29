@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>开发文档 — StockData</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .doc-layout { display: grid; grid-template-columns: 210px 1fr; gap: 34px; align-items: start; }
+  .doc-side { position: sticky; top: 86px; }
+  .doc-side a {
+    display: block; padding: 8px 12px; border-radius: 8px; font-size: 14px;
+    color: var(--text-dim); margin-bottom: 2px; transition: all .2s;
+  }
+  .doc-side a:hover { background: rgba(61,125,255,.1); color: var(--text); }
+  .doc-sec { margin-bottom: 44px; scroll-margin-top: 90px; }
+  .doc-sec h3 { font-size: 21px; font-weight: 700; margin-bottom: 14px; letter-spacing: -.3px; }
+  .doc-sec p { color: var(--text-dim); margin-bottom: 14px; font-size: 15px; }
+  .ep {
+    display: flex; align-items: center; gap: 12px; padding: 13px 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .method {
+    padding: 3px 9px; border-radius: 5px; font-size: 11.5px; font-weight: 700;
+    background: rgba(61,125,255,.16); color: #7aa5ff; font-family: var(--mono);
+  }
+  .method.post { background: rgba(22,199,132,.16); color: #16c784; }
+  .method.del  { background: rgba(240,69,58,.16);  color: #f0453a; }
+  .ep-path { font-family: var(--mono); font-size: 13.5px; color: var(--text); }
+  .ep-desc { font-size: 13.5px; color: var(--muted); width: 100%; }
+  table.params { font-size: 13.5px; }
+  table.params td { padding: 10px 12px; }
+  table.params td:first-child { font-family: var(--mono); color: #7aa5ff; width: 130px; }
+  table.params td:nth-child(2) { color: var(--muted); width: 90px; }
+  @media (max-width: 860px) { .doc-layout { grid-template-columns: 1fr; } .doc-side { position: static; } }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="/">
+      <div class="logo-mark">S</div>
+      <div>StockData <span>金融数据平台</span></div>
+    </a>
+    <div class="nav-links" style="margin-left:auto">
+      <a href="/console.html">控制台</a>
+      <a href="/api/docs">OpenAPI</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="container">
+    <div class="page-head">
+      <div class="page-title">开发文档</div>
+      <div class="page-sub">统一信封响应，业务数据永远在 data 字段中</div>
+    </div>
+
+    <div class="doc-layout">
+      <aside class="doc-side">
+        <a href="#auth">鉴权方式</a>
+        <a href="#lifecycle">密钥生命周期</a>
+        <a href="#public">免鉴权接口</a>
+        <a href="#quote">行情快照</a>
+        <a href="#kline">历史 K 线</a>
+        <a href="#special">特色数据</a>
+        <a href="#meta">元数据</a>
+        <a href="#limits">限流与错误码</a>
+      </aside>
+
+      <main>
+        <!-- 鉴权 -->
+        <section class="doc-sec" id="auth">
+          <h3>鉴权方式</h3>
+          <p>所有 <code class="mono">/api/v1/*</code> 接口都需要在请求头携带 API Key：</p>
+          <p>三种传法任选其一，服务端都会识别：</p>
+          <div class="code-block">
+            <div class="code-head"><span class="code-lang">HTTP Header / Query</span></div>
+            <div class="code-body">Authorization: Bearer sk_live_xxxxxxxxxxxxxxxxxxxx
+X-API-Key: sk_live_xxxxxxxxxxxxxxxxxxxx
+?apikey=sk_live_xxxxxxxxxxxxxxxxxxxx   <span class="c"># 便于浏览器地址栏调试</span></div>
+          </div>
+          <div class="alert alert-info">
+            💡 API Key 明文仅在创建时显示一次，请妥善保存。遗失后请在控制台轮换生成新密钥。
+          </div>
+        </section>
+
+        <!-- 密钥生命周期 -->
+        <section class="doc-sec" id="lifecycle">
+          <h3>密钥生命周期</h3>
+          <p>一个 API Key 有三种状态，对应三个操作。控制台的按钮会随状态切换：</p>
+          <div class="ep">
+            <span class="method post">POST</span>
+            <span class="ep-path">/api/v1/apikey</span>
+            <div class="ep-desc">创建。<strong>明文只在这一次响应里返回</strong>（字段 <code class="mono">secret</code>），之后只能看到掩码，请立刻保存。</div>
+          </div>
+          <div class="ep">
+            <span class="method del">DELETE</span>
+            <span class="ep-path">/api/v1/apikey/{id}</span>
+            <div class="ep-desc"><strong>吊销（软删除）</strong>：立即失效并写入 Redis 黑名单，调用方无需等缓存过期。记录保留，可追溯，仍占用配额位。</div>
+          </div>
+          <div class="ep">
+            <span class="method del">DELETE</span>
+            <span class="ep-path">/api/v1/apikey/{id}/purge</span>
+            <div class="ep-desc"><strong>永久删除（物理删除）</strong>：从数据库抹掉记录，不可恢复。<strong>只能删除已吊销的密钥</strong>，未吊销会返回 400。历史调用日志（<code class="mono">api_logs</code>）会保留，用于审计。</div>
+          </div>
+          <div class="alert alert-info">
+            💡 建议流程：先吊销 → 观察 1～2 天确认没有程序在用 → 再永久删除。直接删未吊销的密钥是不允许的，就是为了避免误删正在服务的密钥。
+          </div>
+        </section>
+
+        <!-- 免鉴权接口 -->
+        <section class="doc-sec" id="public">
+          <h3>免鉴权接口</h3>
+          <p>以下两个接口<strong>不需要 API Key</strong>，用于主页展示与快速体验：</p>
+          <div class="ep">
+            <span class="method">GET</span>
+            <span class="ep-path">/api/v1/public/quote</span>
+            <div class="ep-desc">返回固定演示标的的实时快照（上证指数、贵州茅台、五粮液、中国平安、招商银行、平安银行）。</div>
+          </div>
+          <div class="ep">
+            <span class="method">GET</span>
+            <span class="ep-path">/api/v1/public/market</span>
+            <div class="ep-desc">市场概览：三大指数 + 科创50、全市场涨跌家数、涨停/跌停统计、领涨领跌榜。结果缓存 30 秒。</div>
+          </div>
+          <div class="code-block" style="margin-top:14px">
+            <div class="code-head"><span class="code-lang">market 响应结构</span></div>
+            <div class="code-body">{
+  "indices":     [ {code, name, price, change, change_pct, ...} ],
+  "breadth":     { total, up, down, flat, limit_up, limit_down,
+                   avg_pct, median_pct, up_ratio },
+  "top_gainers": [ {code, name, price, change_pct} ],
+  "top_losers":  [ {code, name, price, change_pct} ]
+}</div>
+          </div>
+        </section>
+
+        <!-- 行情 -->
+        <section class="doc-sec" id="quote">
+          <h3>行情快照</h3>
+          <div class="ep">
+            <span class="method">GET</span>
+            <span class="ep-path">/api/v1/quote?codes=600519.SH,000001.SZ</span>
+            <div class="ep-desc">批量实时快照。多源自动选主，异常时自动降级。单次最多 200 只。</div>
+          </div>
+          <table class="params">
+            <tr><td>codes</td><td>必填</td><td>股票代码，逗号分隔。支持 600519 / sh600519 / 600519.SH 三种写法</td></tr>
+            <tr><td>source</td><td>可选</td><td>指定数据源：tencent / hithink / sina / eastmoney。不填则自动选择</td></tr>
+          </table>
+          <div class="code-block" style="margin-top:14px">
+            <div class="code-head"><span class="code-lang">响应字段</span></div>
+            <div class="code-body">code, name, price, pre_close, open, high, low,
+volume（股）, amount（元）, change, change_pct,
+turnover_rate（换手率%）, vol_ratio（量比）,
+circ_mv（流通市值/亿）, pe, pb, ts</div>
+          </div>
+        </section>
+
+        <!-- K 线 -->
+        <section class="doc-sec" id="kline">
+          <h3>历史 K 线</h3>
+          <div class="ep">
+            <span class="method">GET</span>
+            <span class="ep-path">/api/v1/kline?code=600519.SH&period=day&limit=100&adjust=qfq</span>
+            <div class="ep-desc">默认走通达信（全市场批量最快），失败自动降级到同花顺 / 东财。</div>
+          </div>
+          <table class="params">
+            <tr><td>code</td><td>必填</td><td>单只标的代码</td></tr>
+            <tr><td>period</td><td>可选</td><td>day / week / month / 60min / 30min / 15min / 5min / 1min，默认 day</td></tr>
+            <tr><td>limit</td><td>可选</td><td>返回条数，1~2000，默认 100</td></tr>
+            <tr><td>adjust</td><td>可选</td><td>none / qfq（前复权，默认）/ hfq（后复权）</td></tr>
+            <tr><td>source</td><td>可选</td><td>tdx（默认）/ hithink / eastmoney</td></tr>
+          </table>
+        </section>
+
+        <!-- 特色数据 -->
+        <section class="doc-sec" id="special">
+          <h3>特色数据</h3>
+          <div class="ep">
+            <span class="method">GET</span>
+            <span class="ep-path">/api/v1/special/{kind}</span>
+            <div class="ep-desc">涨停池、跌停池、炸板池、连板天梯、龙虎榜、飙升榜、热股榜、异动分析</div>
+          </div>
+          <table class="params">
+            <tr><td>limit_up</td><td>—</td><td>涨停池</td></tr>
+            <tr><td>limit_down</td><td>—</td><td>跌停池</td></tr>
+            <tr><td>limit_break</td><td>—</td><td>炸板池</td></tr>
+            <tr><td>limit_up_ladder</td><td>—</td><td>连板天梯</td></tr>
+            <tr><td>dragon_tiger</td><td>—</td><td>龙虎榜（source=hithink 默认，source=kaipanla 走开盘了交叉校验）</td></tr>
+            <tr><td>skyrocket</td><td>—</td><td>飙升榜</td></tr>
+            <tr><td>hot_stock</td><td>—</td><td>热股榜</td></tr>
+            <tr><td>anomaly</td><td>—</td><td>异动分析</td></tr>
+          </table>
+        </section>
+
+        <!-- 元数据 -->
+        <section class="doc-sec" id="meta">
+          <h3>元数据与状态</h3>
+          <div class="ep">
+            <span class="method">GET</span>
+            <span class="ep-path">/api/v1/stock/list?q=茅台&limit=50</span>
+            <div class="ep-desc">股票代码与名称检索</div>
+          </div>
+          <div class="ep">
+            <span class="method">GET</span>
+            <span class="ep-path">/api/v1/sources</span>
+            <div class="ep-desc">各数据源健康状态：成功/失败次数、最近延迟、最近错误</div>
+          </div>
+        </section>
+
+        <!-- 限流 -->
+        <section class="doc-sec" id="limits">
+          <h3>限流与错误码</h3>
+          <p>按 API Key 做分钟级滑动窗口限流。超限返回 <code class="mono">429</code> 并带 <code class="mono">Retry-After</code> 头。</p>
+          <table class="params">
+            <tr><td>0</td><td>成功</td><td>—</td></tr>
+            <tr><td>400</td><td>参数错误</td><td>检查必填参数与取值范围</td></tr>
+            <tr><td>401</td><td>未授权</td><td>缺少 / 无效 / 已吊销 / 已过期的 API Key</td></tr>
+            <tr><td>403</td><td>权限不足</td><td>该 Key 未分配对应 scope</td></tr>
+            <tr><td>429</td><td>频率超限</td><td>降低频率后重试，参考 Retry-After</td></tr>
+            <tr><td>502</td><td>数据源不可用</td><td>所有数据源均失败，稍后重试</td></tr>
+          </table>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

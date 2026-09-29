@@ -1,0 +1,47 @@
+# 凭据 —— 绝对不要提交
+.env
+.env.*
+!.env.example
+.hithink_key
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# 数据
+data/
+*.db
+*.sqlite3
+
+# 本地调试产物
+_smoke_data.json
+
+# 其他
+.DS_Store
+*.log
+
+# ---------------------------------------------------------
+# 开源前追加：以下内容属于本地产物或第三方版权材料，不能进仓库
+# ---------------------------------------------------------
+
+# 临时工作目录（离线快照、Edge headless 的临时 profile 等）
+.tmp/
+
+# 本地生成的导出物（对比截图、一次性报告）
+outputs/
+
+# 第三方版权材料 —— 同花顺官方文档的全文转载（421KB）。
+# 这是开发时抓的参考资料，不是本项目的一部分，随仓库分发有版权风险。
+# 需要时从官方重新获取：https://fuyao.aicubes.cn/llms.txt
+docs/hithink-llms-full.txt

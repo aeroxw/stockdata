@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 — StockData</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="/">
+      <div class="logo-mark">S</div>
+      <div>StockData <span>管理后台</span></div>
+    </a>
+    <div class="nav-links" style="margin-left:auto">
+      <span class="env-chip" id="envChip">—</span>
+      <span class="admin-me" id="adminMe">—</span>
+      <a href="/console.html">控制台</a>
+      <a href="#" id="logoutBtn">退出</a>
+    </div>
+  </div>
+</nav>
+
+<div class="admin-shell">
+  <!-- ============ 侧边栏 ============ -->
+  <aside class="admin-side">
+    <div class="side-block">
+      <div class="side-label">监控</div>
+      <button class="side-item active" data-view="overview">
+        <span class="side-ico">◧</span>系统概览
+      </button>
+      <button class="side-item" data-view="sources">
+        <span class="side-ico">◉</span>数据源健康
+        <span class="side-badge" id="srcBadge">—</span>
+      </button>
+    </div>
+    <div class="side-block">
+      <div class="side-label">运营</div>
+      <button class="side-item" data-view="users">
+        <span class="side-ico">◍</span>用户管理
+        <span class="side-badge" id="userBadge">—</span>
+      </button>
+      <button class="side-item" data-view="keys">
+        <span class="side-ico">⌘</span>API 密钥
+        <span class="side-badge" id="keyBadge">—</span>
+      </button>
+      <button class="side-item" data-view="logs">
+        <span class="side-ico">≡</span>调用日志
+      </button>
+    </div>
+    <div class="side-block">
+      <div class="side-label">商业化</div>
+      <button class="side-item" data-view="plans">
+        <span class="side-ico">◈</span>套餐管理
+        <span class="side-badge" id="planBadge">—</span>
+      </button>
+      <button class="side-item" data-view="orders">
+        <span class="side-ico">⌗</span>订单与账单
+        <span class="side-badge" id="orderBadge">—</span>
+      </button>
+    </div>
+    <div class="side-foot">
+      <div class="side-foot-row"><span>数据库</span><b id="sfDb">—</b></div>
+      <div class="side-foot-row"><span>缓存</span><b id="sfRedis">—</b></div>
+      <div class="side-foot-row"><span>运行时长</span><b id="sfUptime">—</b></div>
+    </div>
+  </aside>
+
+  <!-- ============ 主区 ============ -->
+  <main class="admin-main">
+    <div class="admin-head">
+      <div>
+        <h1 class="admin-title" id="viewTitle">系统概览</h1>
+        <p class="admin-sub" id="viewSub">平台整体运行状况与关键指标</p>
+      </div>
+      <div class="head-actions">
+        <span class="live-badge"><span class="live-dot"></span><span id="lastUpdated">尚未加载</span></span>
+        <label class="auto-switch">
+          <input type="checkbox" id="autoChk" checked> 自动刷新
+        </label>
+        <button class="btn-refresh" id="refreshBtn">↻ 刷新</button>
+      </div>
+    </div>
+
+    <div id="permBox"></div>
+
+    <!-- ---------- 概览 ---------- -->
+    <section class="view" id="view-overview">
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">注册用户</div>
+          <div class="kpi-value" id="kpiUsers">—</div>
+          <div class="kpi-sub" id="kpiUsersSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">活跃密钥</div>
+          <div class="kpi-value" id="kpiKeys">—</div>
+          <div class="kpi-sub" id="kpiKeysSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">24 小时调用</div>
+          <div class="kpi-value" id="kpiCalls">—</div>
+          <div class="kpi-sub" id="kpiCallsSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">错误率</div>
+          <div class="kpi-value" id="kpiErr">—</div>
+          <div class="kpi-sub" id="kpiErrSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">平均延迟</div>
+          <div class="kpi-value" id="kpiLat">—</div>
+          <div class="kpi-sub" id="kpiLatSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">数据源</div>
+          <div class="kpi-value" id="kpiSrc">—</div>
+          <div class="kpi-sub" id="kpiSrcSub">—</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">24 小时调用趋势</div>
+          <div class="chart-legend">
+            <span><i class="lg lg-ok"></i>成功</span>
+            <span><i class="lg lg-err"></i>失败</span>
+          </div>
+        </div>
+        <div id="trendWrap" class="chart-wrap"><div class="empty">加载中…</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">热门接口 Top 8</div>
+            <span class="panel-note">近 24 小时</span></div>
+          <div id="topPathsWrap"><div class="empty">加载中…</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">响应状态分布</div>
+            <span class="panel-note">近 24 小时</span></div>
+          <div id="statusWrap"><div class="empty">加载中…</div></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">套餐分布</div></div>
+          <div id="tierWrap"><div class="empty">加载中…</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">系统信息</div></div>
+          <div id="sysWrap"><div class="empty">加载中…</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 数据源 ---------- -->
+    <section class="view hidden" id="view-sources">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">数据源健康状态</div>
+          <span class="panel-note">成功 / 失败 次数为进程内累计</span>
+        </div>
+        <div id="srcWrap" class="src-grid"><div class="empty">加载中…</div></div>
+      </div>
+    </section>
+
+    <!-- ---------- 用户 ---------- -->
+    <section class="view hidden" id="view-users">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">用户管理</div>
+          <button class="btn btn-primary btn-sm" onclick="openCreateUser()">+ 新建用户</button>
+        </div>
+        <div class="toolbar">
+          <input class="tb-input" id="uQ" placeholder="搜索邮箱或 ID…" oninput="debounce(loadUsers, 300)()">
+          <!-- 套餐选项由 /admin/plans 动态填充，见 renderTierFilter() -->
+          <select class="tb-select" id="uTier" onchange="loadUsers()">
+            <option value="">全部套餐</option>
+          </select>
+          <select class="tb-select" id="uStatus" onchange="loadUsers()">
+            <option value="all">全部状态</option>
+            <option value="active">正常</option>
+            <option value="disabled">已禁用</option>
+          </select>
+          <span class="tb-count" id="uCount">—</span>
+        </div>
+        <div class="table-scroll"><div id="userWrap"><div class="empty">加载中…</div></div></div>
+        <div class="pager" id="uPager"></div>
+      </div>
+    </section>
+
+    <!-- ---------- 密钥 ---------- -->
+    <section class="view hidden" id="view-keys">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">API 密钥</div></div>
+        <div class="toolbar">
+          <input class="tb-input" id="kQ" placeholder="搜索名称 / 前缀 / 归属邮箱…" oninput="debounce(loadKeys, 300)()">
+          <select class="tb-select" id="kStatus" onchange="loadKeys()">
+            <option value="all">全部状态</option>
+            <option value="active">有效</option>
+            <option value="revoked">已吊销</option>
+          </select>
+          <span class="tb-count" id="kCount">—</span>
+        </div>
+        <div class="table-scroll"><div id="keyWrap"><div class="empty">加载中…</div></div></div>
+        <div class="pager" id="kPager"></div>
+      </div>
+    </section>
+
+    <!-- ---------- 日志 ---------- -->
+    <section class="view hidden" id="view-logs">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">调用日志</div>
+          <span class="panel-note">仅保留最近记录，按天清理</span></div>
+        <div class="toolbar">
+          <input class="tb-input" id="lQ" placeholder="搜索接口路径…" oninput="debounce(loadLogs, 300)()">
+          <select class="tb-select" id="lStatus" onchange="loadLogs()">
+            <option value="all">全部</option>
+            <option value="ok">仅成功</option>
+            <option value="err">仅失败</option>
+          </select>
+          <span class="tb-count" id="lCount">—</span>
+        </div>
+        <div class="table-scroll"><div id="logWrap"><div class="empty">加载中…</div></div></div>
+        <div class="pager" id="lPager"></div>
+      </div>
+    </section>
+
+    <!-- ---------- 套餐管理 ---------- -->
+    <section class="view hidden" id="view-plans">
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">在售套餐</div>
+          <div class="kpi-value" id="kpiPlans">—</div>
+          <div class="kpi-sub" id="kpiPlansSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">累计充值</div>
+          <div class="kpi-value" id="kpiPaid">—</div>
+          <div class="kpi-sub" id="kpiPaidSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">待处理订单</div>
+          <div class="kpi-value" id="kpiPending">—</div>
+          <div class="kpi-sub">线下转账待确认</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">用户余额合计</div>
+          <div class="kpi-value" id="kpiBalance">—</div>
+          <div class="kpi-sub">平台应付负债口径</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">套餐版本</div>
+          <button class="btn btn-primary btn-sm" onclick="openPlanEditor()">+ 新建套餐</button>
+        </div>
+        <div class="panel-note" style="margin-bottom:12px">
+          改价格或配额后<b>立即生效</b>；已有用户保留原权益直到下次续费。
+          <code>is_public = 否</code> 的套餐不会出现在用户端，只能由后台手动指派。
+        </div>
+        <div id="planWrap"><div class="empty">加载中…</div></div>
+      </div>
+    </section>
+
+    <!-- ---------- 订单与账单 ---------- -->
+    <section class="view hidden" id="view-orders">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">订单</div>
+          <span class="panel-note">线下转账订单需管理员确认后才会入账</span>
+        </div>
+        <div class="toolbar">
+          <input class="tb-input" id="oQ" placeholder="搜索订单号 / 邮箱…" oninput="debounce(loadAdminOrders, 300)()">
+          <select class="tb-select" id="oKind" onchange="resetP('orders', loadAdminOrders)">
+            <option value="all">全部类型</option>
+            <option value="recharge">充值</option>
+            <option value="upgrade">升级</option>
+            <option value="renew">续费</option>
+            <option value="downgrade">变更</option>
+          </select>
+          <select class="tb-select" id="oStatus" onchange="resetP('orders', loadAdminOrders)">
+            <option value="all">全部状态</option>
+            <option value="pending">待支付</option>
+            <option value="paid">已支付</option>
+            <option value="cancelled">已取消</option>
+          </select>
+          <span class="tb-count" id="oCount">—</span>
+        </div>
+        <div class="table-scroll"><div id="orderWrap"><div class="empty">加载中…</div></div></div>
+        <div class="pager" id="oPager"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">余额流水</div>
+          <select class="tb-select" id="bType" onchange="resetP('bills', loadAdminBills)">
+            <option value="all">全部类型</option>
+            <option value="recharge">充值入账</option>
+            <option value="consume">套餐消费</option>
+            <option value="refund">退款</option>
+            <option value="grant">管理员赠送</option>
+            <option value="deduct">管理员扣减</option>
+          </select>
+        </div>
+        <div class="table-scroll"><div id="billWrap"><div class="empty">加载中…</div></div></div>
+        <div class="pager" id="bPager"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ 弹窗 / Toast ============ -->
+<div class="modal-mask hidden" id="modalMask">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">详情</div>
+      <button class="modal-close" onclick="closeModal()" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+<div class="toast-box" id="toastBox"></div>
+
+<script src="/static/app.js"></script>
+<script>
+/* ============================================================
+   管理后台
+   视图切换 + 各视图数据加载 + 操作
+   ============================================================ */
+
+/* 套餐已改为后台可自定义，不能再在前端写死 free/pro/vip 三档。
+   state.plans 由 /admin/plans 填充；接口还没返回时先用内置三档兜底，
+   避免下拉框空白或渲染报错。 */
+const FALLBACK_PLANS = [
+  { code: 'free', name: '免费版', level: 0, price_month: 0, price_year: 0, max_keys: 3, rate_limit: 60, daily_quota: 1000 },
+  { code: 'pro', name: '专业版', level: 10, price_month: 9900, price_year: 99000, max_keys: 10, rate_limit: 300, daily_quota: 50000 },
+  { code: 'vip', name: '旗舰版', level: 20, price_month: 29900, price_year: 299000, max_keys: 50, rate_limit: 1200, daily_quota: -1 },
+];
+const SRC_LABEL = {
+  hithink: '同花顺', tencent: '腾讯', sina: '新浪',
+  eastmoney: '东方财富', tdx: '通达信', kaipanla: '开盘了',
+};
+const yuan = (cents) => ((cents || 0) / 100).toFixed(2);
+
+/* ---------- 基础工具 ---------- */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function toast(msg, type = 'ok') {
+  const box = document.getElementById('toastBox');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => el.classList.add('toast-out'), 3200);
+  setTimeout(() => el.remove(), 3800);
+}
+
+function debounce(fn, ms) {
+  let t;
+  return function (...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+function fmtAgo(d) {
+  if (!d) return '从未';
+  const s = (Date.now() - new Date(d).getTime()) / 1000;
+  if (s < 60) return '刚刚';
+  if (s < 3600) return Math.floor(s / 60) + ' 分钟前';
+  if (s < 86400) return Math.floor(s / 3600) + ' 小时前';
+  return Math.floor(s / 86400) + ' 天前';
+}
+
+function fmtDur(sec) {
+  if (sec < 60) return sec + ' 秒';
+  if (sec < 3600) return Math.floor(sec / 60) + ' 分钟';
+  if (sec < 86400) return Math.floor(sec / 3600) + ' 小时 ' + Math.floor(sec % 3600 / 60) + ' 分';
+  return Math.floor(sec / 86400) + ' 天 ' + Math.floor(sec % 86400 / 3600) + ' 小时';
+}
+
+const nfmt = (n) => Number(n || 0).toLocaleString('zh-CN');
+
+/* ---------- 登录态 ---------- */
+if (!SD.token) location.href = '/login.html';
+document.getElementById('logoutBtn').onclick = (e) => { e.preventDefault(); SD.logout(); };
+
+let ME = null;
+let autoTimer = null;
+const state = {
+  view: 'overview',
+  users: { offset: 0, limit: 20, total: 0 },
+  keys: { offset: 0, limit: 20, total: 0 },
+  logs: { offset: 0, limit: 30, total: 0 },
+  orders: { offset: 0, limit: 20, total: 0 },
+  bills: { offset: 0, limit: 20, total: 0 },
+  stats: null,
+  sources: [],
+  plans: [],
+};
+
+/* ---------- 套餐工具（全部走 state.plans，读不到就用兜底值） ---------- */
+function planList() {
+  return state.plans && state.plans.length ? state.plans : FALLBACK_PLANS;
+}
+function planOf(code) {
+  return planList().find((p) => p.code === code) || null;
+}
+function planName(code) {
+  const p = planOf(code);
+  return p ? p.name : String(code || '-');
+}
+function planQuota(code) {
+  const p = planOf(code);
+  return p ? p.max_keys : 3;
+}
+function tierOptions(selected) {
+  return planList().map((p) =>
+    `<option value="${esc(p.code)}" ${p.code === selected ? 'selected' : ''}>${esc(p.name)}</option>`
+  ).join('');
+}
+
+/* 金额输入框（元）<-> 分 的小工具，避免每处都手写 /100 */
+function centsOf(v) { return Math.round(parseFloat(v || 0) * 100); }
+
+/* ---------- 视图切换 ---------- */
+const VIEWS = {
+  overview: { title: '系统概览', sub: '平台整体运行状况与关键指标' },
+  sources: { title: '数据源健康', sub: '六家数据源的实时可用性与响应表现' },
+  users: { title: '用户管理', sub: '注册账号、套餐等级与访问权限' },
+  keys: { title: 'API 密钥', sub: '全平台密钥清单，可吊销与清理' },
+  logs: { title: '调用日志', sub: '接口调用明细，用于排障与审计' },
+  plans: { title: '套餐管理', sub: '自定义套餐版本、价格与配额' },
+  orders: { title: '订单与账单', sub: '充值订单、套餐订单与余额流水' },
+};
+
+function switchView(v) {
+  state.view = v;
+  document.querySelectorAll('.side-item').forEach((b) => {
+    b.classList.toggle('active', b.dataset.view === v);
+  });
+  document.querySelectorAll('.view').forEach((s) => s.classList.add('hidden'));
+  document.getElementById('view-' + v).classList.remove('hidden');
+  document.getElementById('viewTitle').textContent = VIEWS[v].title;
+  document.getElementById('viewSub').textContent = VIEWS[v].sub;
+  if (v === 'overview') loadStats();
+  if (v === 'sources') loadSources();
+  if (v === 'users') loadUsers();
+  if (v === 'keys') loadKeys();
+  if (v === 'logs') loadLogs();
+  if (v === 'plans') loadAdminPlans();
+  if (v === 'orders') { loadAdminOrders(); loadAdminBills(); }
+}
+
+document.querySelectorAll('.side-item').forEach((b) => {
+  b.onclick = () => switchView(b.dataset.view);
+});
+document.getElementById('refreshBtn').onclick = () => switchView(state.view);
+
+/* ---------- 概览 ---------- */
+async function loadStats() {
+  try {
+    const r = await SD.api('/admin/stats');
+    const d = r.data;
+    state.stats = d;
+
+    document.getElementById('kpiUsers').textContent = nfmt(d.users);
+    document.getElementById('kpiUsersSub').innerHTML =
+      `近 7 日新增 <b>${d.users_new_7d}</b> · 活跃 <b>${d.users_active_7d}</b>` +
+      (d.users_disabled ? ` · <span class="txt-warn">禁用 ${d.users_disabled}</span>` : '');
+
+    document.getElementById('kpiKeys').textContent = nfmt(d.active_keys);
+    document.getElementById('kpiKeysSub').innerHTML =
+      `共 ${d.api_keys} 个 · 已吊销 ${d.revoked_keys}`;
+
+    document.getElementById('kpiCalls').textContent = nfmt(d.calls_24h);
+    const delta = d.calls_delta_pct;
+    const cls = delta === null ? '' : delta >= 0 ? 'txt-up' : 'txt-down';
+    document.getElementById('kpiCallsSub').innerHTML = delta === null
+      ? '昨日无数据'
+      : `环比 <span class="${cls}">${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)}%</span> · 昨日 ${nfmt(d.calls_prev_24h)}`;
+
+    document.getElementById('kpiErr').textContent = d.error_rate + '%';
+    document.getElementById('kpiErr').className = 'kpi-value ' + (d.error_rate > 5 ? 'txt-up' : 'txt-down');
+    document.getElementById('kpiErrSub').innerHTML = `${nfmt(d.errors_24h)} 次失败`;
+
+    document.getElementById('kpiLat').textContent = Math.round(d.avg_latency_ms) + ' ms';
+    document.getElementById('kpiLatSub').innerHTML = `P95 <b>${d.p95_latency_ms}</b> ms`;
+
+    renderTrend(d.hourly);
+    renderTopPaths(d.top_paths);
+    renderStatus(d.status_dist);
+    /* 后端同时给了 tier_counts（旧字段）和 tiers（含套餐中文名），
+       优先用 tiers；老版本后端没有该字段时回落到 tier_counts。 */
+    renderTiers(
+      d.tiers && d.tiers.length
+        ? d.tiers
+        : Object.keys(d.tier_counts || {}).map((k) => ({ code: k, name: k, count: d.tier_counts[k] })),
+      d.users
+    );
+    renderSys(d.system, d.stock_meta);
+
+    const rev = d.revenue || {};
+    if (document.getElementById('kpiPaid')) {
+      document.getElementById('kpiPaid').textContent = '¥' + yuan(rev.paid_amount);
+      document.getElementById('kpiPaidSub').innerHTML = `已支付 <b>${nfmt(rev.paid_orders)}</b> 笔`;
+      document.getElementById('kpiPending').textContent = nfmt(rev.pending_orders);
+      document.getElementById('kpiBalance').textContent = '¥' + yuan(rev.balance_total);
+    }
+
+    document.getElementById('userBadge').textContent = d.users;
+    document.getElementById('keyBadge').textContent = d.active_keys;
+    document.getElementById('envChip').textContent = d.system.env;
+    document.getElementById('envChip').className = 'env-chip ' + (d.system.debug ? 'env-dev' : 'env-prod');
+    document.getElementById('sfDb').textContent = d.system.database;
+    const rOn = !!(d.system.redis || {}).available;
+    document.getElementById('sfRedis').textContent = rOn ? '已连接' : '未连接（降级）';
+    document.getElementById('sfRedis').className = rOn ? 'txt-down' : 'txt-warn';
+    document.getElementById('sfRedis').title = rOn ? '' : (d.system.redis || {}).error || '';
+    document.getElementById('sfUptime').textContent = fmtDur(d.system.uptime_s);
+
+    await loadSources(true);   // 数据源数量进 KPI
+    stamp();
+  } catch (e) {
+    document.getElementById('permBox').innerHTML =
+      `<div class="alert alert-err">无法加载管理数据：${esc(e.message)}</div>`;
+  }
+}
+
+/* 24 小时趋势：纯 SVG，无外部图表库依赖 */
+function renderTrend(buckets) {
+  if (!buckets || !buckets.length) {
+    document.getElementById('trendWrap').innerHTML = '<div class="empty">暂无调用数据</div>';
+    return;
+  }
+  const W = 760, H = 220, PL = 44, PR = 12, PT = 14, PB = 28;
+  const iw = W - PL - PR, ih = H - PT - PB;
+  const max = Math.max(1, ...buckets.map((b) => b.total));
+  // y 轴刻度取整到好看的档位
+  const step = Math.pow(10, Math.floor(Math.log10(max)));
+  const top = Math.ceil(max / step) * step;
+  const bw = iw / buckets.length;
+
+  let bars = '';
+  buckets.forEach((b, i) => {
+    const h = (b.total / top) * ih;
+    const eh = (b.errors / top) * ih;
+    const x = PL + i * bw + bw * 0.18;
+    const w = bw * 0.64;
+    const y = PT + ih - h;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, 0).toFixed(1)}" rx="2" fill="url(#gOk)"/>`
+      + `<rect x="${x.toFixed(1)}" y="${(PT + ih - eh).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(eh, 0).toFixed(1)}" rx="2" fill="#f0453a"/>`
+      + `<rect x="${(PL + i * bw).toFixed(1)}" y="${PT}" width="${bw.toFixed(1)}" height="${ih}" fill="transparent">`
+      + `<title>${b.hour}　成功 ${b.total - b.errors}　失败 ${b.errors}　合计 ${b.total}</title></rect>`;
+  });
+
+  let grid = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = PT + ih - (ih * i / 4);
+    const val = Math.round(top * i / 4);
+    grid += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W - PR}" y2="${y.toFixed(1)}" stroke="#232e47" stroke-dasharray="3 4"/>`
+      // 注意：SVG 的表现属性不解析 CSS 变量，字体必须写死字族名
+      + `<text x="${PL - 8}" y="${(y + 4).toFixed(1)}" fill="#6b7a99" font-size="10" text-anchor="end" font-family="Consolas, monospace">${val}</text>`;
+  }
+
+  let xlab = '';
+  buckets.forEach((b, i) => {
+    if (i % 4 !== 0 && i !== buckets.length - 1) return;
+    xlab += `<text x="${(PL + i * bw + bw / 2).toFixed(1)}" y="${H - 8}" fill="#6b7a99" font-size="10" text-anchor="middle">${b.hour}</text>`;
+  });
+
+  document.getElementById('trendWrap').innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" class="trend-svg" role="img" aria-label="24 小时调用趋势">
+      <defs>
+        <linearGradient id="gOk" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#5b91ff"/>
+          <stop offset="100%" stop-color="#2b5fd9" stop-opacity=".55"/>
+        </linearGradient>
+      </defs>
+      ${grid}${bars}${xlab}
+    </svg>`;
+}
+
+function renderTopPaths(rows) {
+  const wrap = document.getElementById('topPathsWrap');
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">暂无调用数据</div>'; return; }
+  const max = Math.max(...rows.map((r) => r.count));
+  wrap.innerHTML = rows.map((r) => `
+    <div class="bar-row">
+      <div class="bar-name mono">${esc(r.path)}</div>
+      <div class="bar-track"><span style="width:${(r.count / max * 100).toFixed(1)}%"></span></div>
+      <div class="bar-val mono">${nfmt(r.count)}</div>
+    </div>`).join('');
+}
+
+function renderStatus(dist) {
+  const total = (dist.s2xx || 0) + (dist.s4xx || 0) + (dist.s5xx || 0);
+  const wrap = document.getElementById('statusWrap');
+  if (!total) { wrap.innerHTML = '<div class="empty">暂无调用数据</div>'; return; }
+  const pct = (n) => (n / total * 100).toFixed(1);
+  wrap.innerHTML = `
+    <div class="stack-bar">
+      <span class="st-ok" style="width:${pct(dist.s2xx)}%" title="2xx ${dist.s2xx}"></span>
+      <span class="st-4xx" style="width:${pct(dist.s4xx)}%" title="4xx ${dist.s4xx}"></span>
+      <span class="st-5xx" style="width:${pct(dist.s5xx)}%" title="5xx ${dist.s5xx}"></span>
+    </div>
+    <div class="stack-legend">
+      <div><i class="lg lg-ok"></i>2xx 成功<b class="mono">${nfmt(dist.s2xx)}</b><em>${pct(dist.s2xx)}%</em></div>
+      <div><i class="lg lg-4xx"></i>4xx 客户端错误<b class="mono">${nfmt(dist.s4xx)}</b><em>${pct(dist.s4xx)}%</em></div>
+      <div><i class="lg lg-5xx"></i>5xx 服务端错误<b class="mono">${nfmt(dist.s5xx)}</b><em>${pct(dist.s5xx)}%</em></div>
+    </div>`;
+}
+
+function renderTiers(tiers, total) {
+  const wrap = document.getElementById('tierWrap');
+  /* 后端已按库里的套餐动态给出 tiers（含后台自定义套餐），
+     这里直接渲染，不再依赖前端写死的三档 */
+  const rows = (tiers || []).map((t) => ({
+    code: t.code, name: t.name, n: t.count || 0,
+  }));
+  if (!rows.length) {
+    wrap.innerHTML = '<div class="empty">暂无套餐数据</div>';
+    return;
+  }
+  const max = Math.max(1, ...rows.map((r) => r.n));
+  const bgClass = (code) => ['free', 'pro', 'vip'].includes(code) ? 'bg-' + code : 'bg-pro';
+  wrap.innerHTML = rows.map((r) => `
+    <div class="bar-row">
+      <div class="bar-name"><span class="tier-pill tier-${esc(r.code)}">${esc(r.name)}</span></div>
+      <div class="bar-track"><span class="${bgClass(r.code)}" style="width:${(r.n / max * 100).toFixed(1)}%"></span></div>
+      <div class="bar-val mono">${r.n}</div>
+    </div>`).join('') + `<div class="panel-note" style="margin-top:12px">合计 ${total} 个账号</div>`;
+}
+
+function renderSys(s, stockMeta) {
+  const r = s.redis || {};
+  const rows = [
+    ['应用', s.app],
+    ['运行环境', s.env + (s.debug ? '（DEBUG 开启）' : '')],
+    ['数据库', s.database],
+    ['Redis 地址', r.url || '—'],
+    ['Python', s.python],
+    ['操作系统', s.platform],
+    ['运行时长', fmtDur(s.uptime_s)],
+    ['股票代码表', nfmt(stockMeta) + ' 条'],
+  ];
+  /* Redis 不可用时要把「为什么」和「有什么影响」说清楚，
+     否则只看「未连接」两个字会让人以为是故障。 */
+  const card = r.available
+    ? `<div class="dep-card dep-ok">
+         <div class="dep-top"><b>Redis 缓存</b><span class="status ok">已连接</span></div>
+         <div class="dep-desc">限流、行情缓存、吊销黑名单都在正常工作。</div>
+       </div>`
+    : `<div class="dep-card dep-warn">
+         <div class="dep-top"><b>Redis 缓存</b><span class="status partial">未连接</span></div>
+         <div class="dep-desc">
+           服务已自动降级，<b>不会中断</b>：限流降级为放行，缓存改用进程内兜底，
+           吊销仍由数据库兜底生效。进程重启后限流计数会清零。
+         </div>
+         ${r.error ? `<div class="dep-err mono">${esc(r.error)}</div>` : ''}
+         <div class="dep-foot">
+           <span>每 ${r.retry_interval_s ?? 30} 秒自动重试一次，Redis 起来后会自行接上</span>
+           <button class="btn btn-ghost btn-sm" onclick="recheckRedis()">立即重测</button>
+         </div>
+       </div>`;
+  document.getElementById('sysWrap').innerHTML =
+    `<div class="kv-list">${rows.map(([k, v]) =>
+      `<div class="kv"><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>` + card;
+}
+
+async function recheckRedis() {
+  const btn = event && event.target;
+  if (btn) btn.classList.add('loading');
+  try {
+    const r = await SD.api('/admin/redis/recheck', { method: 'POST' });
+    toast(r.msg || '已重新检测');
+    loadStats();
+  } catch (e) {
+    toast('检测失败：' + e.message, 'err');
+  } finally {
+    if (btn) btn.classList.remove('loading');
+  }
+}
+
+/* ---------- 数据源 ---------- */
+async function loadSources(silent) {
+  try {
+    const r = await SD.api('/sources');
+    const rows = r.data || [];
+    state.sources = rows;
+    const ok = rows.filter((s) => s.ok > 0 && !s.last_error).length;
+    const degraded = rows.filter((s) => s.ok > 0 && s.last_error).length;
+    document.getElementById('srcBadge').textContent = `${ok}/${rows.length}`;
+    document.getElementById('kpiSrc').textContent = `${ok}/${rows.length}`;
+    document.getElementById('kpiSrcSub').innerHTML = degraded
+      ? `<span class="txt-warn">${degraded} 个源最近出错</span>`
+      : '全部正常';
+    if (!silent) renderSources(rows);
+  } catch (e) {
+    if (!silent) toast('数据源状态加载失败：' + e.message, 'err');
+  }
+}
+
+function renderSources(rows) {
+  const wrap = document.getElementById('srcWrap');
+  if (!rows.length) { wrap.innerHTML = '<div class="empty">暂无数据源</div>'; return; }
+  wrap.innerHTML = rows.map((s) => {
+    const healthy = s.ok > 0 && !s.last_error;
+    const warn = s.ok > 0 && !!s.last_error;
+    const total = (s.ok || 0) + (s.fail || 0);
+    const rate = total ? ((s.ok / total) * 100).toFixed(0) : 0;
+    return `<div class="src-card ${healthy ? 'is-ok' : warn ? 'is-warn' : 'is-idle'}">
+      <div class="src-top">
+        <div class="src-name">${esc(SRC_LABEL[s.source] || s.source)}</div>
+        <span class="status ${healthy ? 'ok' : warn ? 'partial' : ''}">${healthy ? '正常' : warn ? '降级' : '未调用'}</span>
+      </div>
+      <div class="src-code mono">${esc(s.source)}</div>
+      <div class="src-metrics">
+        <div><span>成功率</span><b>${total ? rate + '%' : '—'}</b></div>
+        <div><span>成功/失败</span><b class="mono">${s.ok || 0} / ${s.fail || 0}</b></div>
+        <div><span>最近耗时</span><b class="mono">${s.last_latency_ms || 0} ms</b></div>
+      </div>
+      ${s.last_error ? `<div class="src-err">${esc(s.last_error)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ---------- 用户 ---------- */
+async function loadUsers() {
+  const s = state.users;
+  const q = document.getElementById('uQ').value.trim();
+  const tier = document.getElementById('uTier').value;
+  const status = document.getElementById('uStatus').value;
+  const qs = new URLSearchParams({
+    offset: s.offset, limit: s.limit, status,
+    ...(q ? { q } : {}), ...(tier ? { tier } : {}),
+  });
+  try {
+    const r = await SD.api('/admin/users?' + qs.toString());
+    const d = r.data;
+    s.total = d.total;
+    document.getElementById('uCount').textContent = `共 ${d.total} 个用户`;
+    renderUsers(d.items);
+    renderPager('uPager', 'users');
+    stamp();
+  } catch (e) { toast('用户列表加载失败：' + e.message, 'err'); }
+}
+
+function renderUsers(rows) {
+  const wrap = document.getElementById('userWrap');
+  state.userRows = rows || [];   // 弹窗里要按 id 回查当前有效期
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的用户</div>'; return; }
+  wrap.innerHTML = `<table class="table-nowrap">
+    <thead><tr>
+      <th>用户</th><th>套餐</th><th>角色</th><th>状态</th>
+      <th>Key 用量</th><th>余额</th><th>24h 调用</th><th>注册时间</th><th style="text-align:right">操作</th>
+    </tr></thead>
+    <tbody>${rows.map((u) => {
+      const quota = u.key_quota ?? planQuota(u.tier);
+      const full = (u.active_keys || 0) >= quota;
+      const me = ME && u.id === ME.id;
+      const bal = u.balance || 0;
+      return `<tr${u.is_active ? '' : ' class="row-dim"'}>
+        <td>
+          <div class="cell-main" title="${esc(u.email)}">${esc(u.email)}</div>
+          <div class="cell-sub mono">#${u.id}${me ? ' · 当前登录' : ''}</div>
+        </td>
+        <td>
+          <select class="tier-select tier-${esc(u.tier)}" onchange="changeTier(${u.id}, this.value)">
+            ${tierOptions(u.tier)}
+          </select>
+          <div class="cell-sub">${expiryCell(u)}</div>
+        </td>
+        <td>${u.is_admin ? '<span class="status main">管理员</span>' : '<span class="cell-sub">普通用户</span>'}</td>
+        <td>${u.is_active
+          ? '<span class="status ok">正常</span>'
+          : '<span class="status partial">已禁用</span>'}</td>
+        <td class="mono ${full ? 'txt-warn' : ''}">${u.active_keys || 0} / ${quota}</td>
+        <td class="mono">¥${yuan(bal)}</td>
+        <td class="mono">${nfmt(u.calls_24h)}</td>
+        <td class="cell-sub">${SD.fmtTime(u.created_at)}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn btn-ghost btn-sm" onclick="viewUser(${u.id})">详情</button>
+          <button class="btn btn-ghost btn-sm" onclick="openBalanceEditor(${u.id}, '${esc(u.email)}', ${bal})">余额</button>
+          <button class="btn btn-ghost btn-sm" onclick="openExpiryEditor(${u.id}, '${esc(u.email)}')">有效期</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleUser(${u.id}, ${u.is_active})">${u.is_active ? '禁用' : '启用'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="resetPwd(${u.id}, '${esc(u.email)}')">改密码</button>
+          ${me ? '' : `<button class="btn btn-danger btn-sm" onclick="delUser(${u.id}, '${esc(u.email)}')">删除</button>`}
+        </td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+/* 有效期单元格：后台必须能一眼看出"试用 / 付费 / 剩几天 / 已过期"，
+   否则管理员根本不知道该不该催用户续费。 */
+function expiryCell(u) {
+  if (!u.plan_expires_at) return '<span style="color:var(--muted)">长期有效</span>';
+  const d = String(u.plan_expires_at).slice(0, 10);
+  const tag = u.is_trial ? '试用' : '付费';
+  if (u.expired) {
+    return `<span class="status err">${tag} · 已过期</span>
+            <span style="color:var(--muted)"> ${d}</span>`;
+  }
+  const warn = u.days_left !== null && u.days_left <= 7;
+  return `<span class="${warn ? 'txt-warn' : ''}">${tag} · 剩 ${u.days_left} 天</span>
+          <span style="color:var(--muted)"> ${d}</span>`;
+}
+
+async function changeTier(id, tier) {
+  try {
+    const r = await SD.api(`/admin/users/${id}/tier`, {
+      method: 'POST', body: JSON.stringify({ tier }),
+    });
+    toast(r.msg || `已调整为 ${planName(tier)}`);
+    loadUsers();
+  } catch (e) {
+    toast('调整失败：' + e.message, 'err');
+    loadUsers();   // 把下拉框回滚到真实值
+  }
+}
+
+/* ---------- 调整有效期 ---------- */
+function openExpiryEditor(id, email) {
+  /* 注意：state.users 是**分页对象** {offset,limit,total}，不是用户数组。
+     用户行单独存一份在 state.userRows，别在这里 .find —— 会直接 TypeError。 */
+  const u = (state.userRows || []).find((x) => x.id === id) || {};
+  const cur = u.plan_expires_at
+    ? `${String(u.plan_expires_at).slice(0, 10)}${u.is_trial ? '（试用期）' : ''}`
+    : '长期有效';
+  openModal('调整有效期', `
+    <div class="kv-list" style="margin-bottom:16px">
+      <div class="kv"><span>用户</span><b>${esc(email)}</b></div>
+      <div class="kv"><span>当前有效期</span><b>${esc(cur)}</b></div>
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>顺延天数（在当前到期日基础上加，留空则用下方精确日期）</label>
+      <input id="expDays" type="number" step="1" placeholder="如 30" autocomplete="off">
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>或指定到期日期</label>
+      <input id="expDate" type="date" autocomplete="off">
+    </div>
+    <div class="chips" style="margin-bottom:18px">
+      <span class="chip" onclick="document.getElementById('expDays').value=15">+15 天</span>
+      <span class="chip" onclick="document.getElementById('expDays').value=30">+30 天</span>
+      <span class="chip" onclick="document.getElementById('expDays').value=365">+1 年</span>
+      <span class="chip" onclick="document.getElementById('expDays').value='';document.getElementById('expDate').value='';window.__expClear=true">设为长期有效</span>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="submitExpiry(${id})">确认调整</button>
+    <div class="panel-note" style="margin-top:10px">
+      顺延会在原到期日基础上累加，不会吞掉用户已买的天数；设为长期有效则不再限制。
+    </div>`);
+  window.__expClear = false;
+}
+
+async function submitExpiry(id) {
+  const daysRaw = document.getElementById('expDays').value;
+  const dateRaw = document.getElementById('expDate').value;
+  const body = {};
+  if (window.__expClear) {
+    body.clear = true;
+  } else if (dateRaw) {
+    body.expires_at = dateRaw + 'T23:59:59';
+  } else if (daysRaw !== '') {
+    body.days = parseInt(daysRaw, 10);
+  } else {
+    toast('请填写天数或选择日期', 'err'); return;
+  }
+  try {
+    const r = await SD.api(`/admin/users/${id}/expiry`, {
+      method: 'POST', body: JSON.stringify(body),
+    });
+    closeModal();
+    toast(r.msg || '已更新有效期');
+    loadUsers();
+  } catch (e) { toast('调整失败：' + e.message, 'err'); }
+}
+
+/* ---------- 调整余额 ---------- */
+function openBalanceEditor(id, email, balanceCents) {
+  openModal('调整余额', `
+    <div class="kv-list" style="margin-bottom:16px">
+      <div class="kv"><span>用户</span><b>${esc(email)}</b></div>
+      <div class="kv"><span>当前余额</span><b class="mono">¥${yuan(balanceCents)}</b></div>
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>变动金额（元，正数为赠送，负数为扣减）</label>
+      <input id="balAmt" type="number" step="0.01" placeholder="如 100 或 -50" autocomplete="off">
+    </div>
+    <div class="field" style="margin-bottom:18px">
+      <label>备注</label>
+      <input id="balRemark" placeholder="如：活动赠送 / 补偿" autocomplete="off">
+    </div>
+    <div class="chips" style="margin-bottom:18px">
+      <span class="chip" onclick="document.getElementById('balAmt').value=50">+50</span>
+      <span class="chip" onclick="document.getElementById('balAmt').value=100">+100</span>
+      <span class="chip" onclick="document.getElementById('balAmt').value=500">+500</span>
+      <span class="chip" onclick="document.getElementById('balAmt').value=-50">-50</span>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="submitBalance(${id})">确认调整</button>
+    <div class="panel-note" style="margin-top:10px">
+      扣减不允许把余额弄成负数；每一笔都会写进余额流水，可在「订单与账单」里查。
+    </div>`);
+}
+
+async function submitBalance(id) {
+  const cents = centsOf(document.getElementById('balAmt').value);
+  const remark = document.getElementById('balRemark').value.trim();
+  if (!cents) { toast('请输入变动金额', 'err'); return; }
+  try {
+    const r = await SD.api(`/admin/users/${id}/balance`, {
+      method: 'POST', body: JSON.stringify({ amount: cents, remark }),
+    });
+    closeModal();
+    toast(r.msg || '余额已调整');
+    loadUsers(); loadStats();
+  } catch (e) { toast('调整失败：' + e.message, 'err'); }
+}
+
+async function toggleUser(id, isActive) {
+  const tip = isActive
+    ? '禁用后该用户将立即无法登录，其 API Key 也会失效。确定继续？'
+    : '确定启用该用户？';
+  if (!confirm(tip)) return;
+  try {
+    await SD.api(`/admin/users/${id}/toggle`, { method: 'POST' });
+    toast(isActive ? '用户已禁用' : '用户已启用');
+    loadUsers();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function resetPwd(id, email) {
+  const pwd = prompt(`为 ${email} 设置新密码（至少 8 位）：`);
+  if (!pwd) return;
+  if (pwd.length < 8) { toast('密码至少 8 位', 'err'); return; }
+  try {
+    await SD.api(`/admin/users/${id}/password`, {
+      method: 'POST', body: JSON.stringify({ password: pwd }),
+    });
+    toast('密码已重置');
+  } catch (e) { toast('重置失败：' + e.message, 'err'); }
+}
+
+async function delUser(id, email) {
+  if (!confirm(`确定删除用户 ${email} 吗？\n\n该用户名下的所有 API Key 会一并删除且无法恢复，\n调用日志会保留用于审计。`)) return;
+  try {
+    const r = await SD.api(`/admin/users/${id}`, { method: 'DELETE' });
+    toast((r.msg || '已删除') + `（清理 ${r.data?.deleted_keys ?? 0} 个密钥）`);
+    loadUsers();
+    loadStats();
+  } catch (e) { toast('删除失败：' + e.message, 'err'); }
+}
+
+async function viewUser(id) {
+  openModal('用户详情', '<div class="empty">加载中…</div>');
+  try {
+    const r = await SD.api('/admin/users/' + id);
+    const d = r.data;
+    const u = d.user;
+    document.getElementById('modalBody').innerHTML = `
+      <div class="kv-list" style="margin-bottom:18px">
+        <div class="kv"><span>邮箱</span><b>${esc(u.email)}</b></div>
+        <div class="kv"><span>ID</span><b class="mono">#${u.id}</b></div>
+        <div class="kv"><span>套餐</span><b><span class="tier-pill tier-${u.tier}">${u.tier.toUpperCase()}</span></b></div>
+        <div class="kv"><span>角色</span><b>${u.is_admin ? '管理员' : '普通用户'}</b></div>
+        <div class="kv"><span>状态</span><b>${u.is_active ? '正常' : '已禁用'}</b></div>
+        <div class="kv"><span>注册时间</span><b>${SD.fmtTime(u.created_at)}</b></div>
+        <div class="kv"><span>最后登录</span><b>${u.last_login ? SD.fmtTime(u.last_login) : '从未登录'}</b></div>
+        <div class="kv"><span>累计调用</span><b class="mono">${nfmt(d.calls_total)}</b></div>
+        <div class="kv"><span>24h 调用</span><b class="mono">${nfmt(d.calls_24h)}</b></div>
+      </div>
+      <div class="modal-sec">API 密钥（${d.keys.length}）</div>
+      ${d.keys.length ? `<table class="mini"><thead><tr><th>名称</th><th>密钥</th><th>状态</th><th>调用</th><th>最后使用</th></tr></thead>
+        <tbody>${d.keys.map((k) => `<tr>
+          <td>${esc(k.name)}</td>
+          <td class="mono">${esc(k.masked)}</td>
+          <td>${k.is_active ? '<span class="status ok">有效</span>' : '<span class="status partial">已吊销</span>'}</td>
+          <td class="mono">${nfmt(k.total_calls)}</td>
+          <td class="cell-sub">${k.last_used ? fmtAgo(k.last_used) : '未使用'}</td>
+        </tr>`).join('')}</tbody></table>` : '<div class="empty">该用户还没有创建密钥</div>'}
+      <div class="modal-sec">最近调用（${d.recent_logs.length}）</div>
+      ${d.recent_logs.length ? `<table class="mini"><thead><tr><th>时间</th><th>路径</th><th>状态</th><th>耗时</th></tr></thead>
+        <tbody>${d.recent_logs.map((l) => `<tr>
+          <td class="cell-sub">${SD.fmtTime(l.ts)}</td>
+          <td class="mono">${esc(l.path)}</td>
+          <td class="${l.status >= 400 ? 'txt-up' : 'txt-down'} mono">${l.status}</td>
+          <td class="mono">${l.latency_ms} ms</td>
+        </tr>`).join('')}</tbody></table>` : '<div class="empty">暂无调用记录</div>'}`;
+  } catch (e) {
+    document.getElementById('modalBody').innerHTML =
+      `<div class="alert alert-err">${esc(e.message)}</div>`;
+  }
+}
+
+function openCreateUser() {
+  openModal('新建用户', `
+    <div class="field" style="margin-bottom:14px">
+      <label>邮箱</label>
+      <input id="nuEmail" type="email" placeholder="user@example.com" autocomplete="off">
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>初始密码（至少 8 位）</label>
+      <input id="nuPwd" type="text" placeholder="留空则随机生成" autocomplete="off">
+    </div>
+    <div class="field" style="margin-bottom:18px">
+      <label>套餐</label>
+      <select id="nuTier">${tierOptions('free')}</select>
+    </div>
+    <button class="btn btn-primary" onclick="submitCreateUser()" style="width:100%">创建</button>
+    <div class="panel-note" style="margin-top:10px">
+      提示：也可以让用户自己在注册页注册，这里只是给需要直接开号的场景用。
+    </div>`);
+}
+
+async function submitCreateUser() {
+  const email = document.getElementById('nuEmail').value.trim();
+  const pwd = document.getElementById('nuPwd').value.trim() || randomPwd();
+  const tier = document.getElementById('nuTier').value;
+  if (!email) { toast('请填写邮箱', 'err'); return; }
+  if (pwd.length < 8) { toast('密码至少 8 位', 'err'); return; }
+  try {
+    // 注册接口固定给 free，创建成功后再按邮箱定位并改套餐
+    await SD.api('/auth/register', {
+      method: 'POST', body: JSON.stringify({ email, password: pwd }),
+    });
+  } catch (e) {
+    toast('创建失败：' + e.message, 'err');
+    return;
+  }
+  try {
+    const r = await SD.api(`/admin/users?limit=200&q=${encodeURIComponent(email)}`);
+    const hit = (r.data.items || []).find((u) => u.email === email);
+    if (hit && tier !== 'free') {
+      await SD.api(`/admin/users/${hit.id}/tier`, {
+        method: 'POST', body: JSON.stringify({ tier }),
+      });
+    }
+    closeModal();
+    toast(`已创建 ${email}（初始密码：${pwd}）`);
+    loadUsers(); loadStats();
+  } catch (e) {
+    toast('创建后查询失败：' + e.message, 'err');
+  }
+}
+
+function randomPwd() {
+  const cs = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = 'Sd@';
+  for (let i = 0; i < 9; i++) s += cs[Math.floor(Math.random() * cs.length)];
+  return s;
+}
+
+/* ---------- 密钥 ---------- */
+async function loadKeys() {
+  const s = state.keys;
+  const q = document.getElementById('kQ').value.trim();
+  const status = document.getElementById('kStatus').value;
+  const qs = new URLSearchParams({
+    offset: s.offset, limit: s.limit, status, ...(q ? { q } : {}),
+  });
+  try {
+    const r = await SD.api('/admin/keys?' + qs.toString());
+    const d = r.data;
+    s.total = d.total;
+    document.getElementById('kCount').textContent = `共 ${d.total} 个密钥`;
+    renderKeys(d.items);
+    renderPager('kPager', 'keys');
+    stamp();
+  } catch (e) { toast('密钥列表加载失败：' + e.message, 'err'); }
+}
+
+function renderKeys(rows) {
+  const wrap = document.getElementById('keyWrap');
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的密钥</div>'; return; }
+  wrap.innerHTML = `<table class="table-nowrap">
+    <thead><tr>
+      <th>名称</th><th>归属</th><th>密钥</th><th>权限</th><th>限流</th>
+      <th>调用</th><th>最后使用</th><th>状态</th><th style="text-align:right">操作</th>
+    </tr></thead>
+    <tbody>${rows.map((k) => `<tr${k.is_active ? '' : ' class="row-dim"'}>
+      <td><div class="cell-main" title="${esc(k.name)}">${esc(k.name)}</div><div class="cell-sub mono">#${k.id}</div></td>
+      <td><div class="cell-main" title="${esc(k.user_email)}">${esc(k.user_email)}</div><div class="cell-sub mono">#${k.user_id}</div></td>
+      <td class="mono">${esc(k.masked)}</td>
+      <td class="cell-sub">${(k.scopes || []).join(', ') || '—'}</td>
+      <td class="mono">${k.rate_limit}/min</td>
+      <td class="mono">${nfmt(k.total_calls)}</td>
+      <td class="cell-sub">${k.last_used ? fmtAgo(k.last_used) : '未使用'}</td>
+      <td>${k.is_active ? '<span class="status ok">有效</span>' : '<span class="status partial">已吊销</span>'}</td>
+      <td style="text-align:right;white-space:nowrap">
+        ${k.is_active
+          ? `<button class="btn btn-danger btn-sm" onclick="revokeKey(${k.id}, '${esc(k.name)}')">吊销</button>`
+          : `<button class="btn btn-danger btn-sm" onclick="purgeKey(${k.id}, '${esc(k.name)}')">删除</button>`}
+      </td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+async function revokeKey(id, name) {
+  if (!confirm(`确定吊销「${name}」？使用它的程序将立即无法访问接口。`)) return;
+  try {
+    await SD.api(`/admin/keys/${id}/revoke`, { method: 'POST' });
+    toast('密钥已吊销'); loadKeys(); loadStats();
+  } catch (e) { toast('吊销失败：' + e.message, 'err'); }
+}
+
+async function purgeKey(id, name) {
+  if (!confirm(`确定永久删除「${name}」？记录将被抹掉且无法恢复，调用日志会保留。`)) return;
+  try {
+    await SD.api(`/admin/keys/${id}`, { method: 'DELETE' });
+    toast('密钥已永久删除'); loadKeys(); loadStats();
+  } catch (e) { toast('删除失败：' + e.message, 'err'); }
+}
+
+/* ---------- 日志 ---------- */
+async function loadLogs() {
+  const s = state.logs;
+  const q = document.getElementById('lQ').value.trim();
+  const status = document.getElementById('lStatus').value;
+  const qs = new URLSearchParams({
+    offset: s.offset, limit: s.limit, status, ...(q ? { q } : {}),
+  });
+  try {
+    const r = await SD.api('/admin/logs?' + qs.toString());
+    const d = r.data;
+    s.total = d.total;
+    document.getElementById('lCount').textContent = `共 ${d.total} 条记录`;
+    renderLogs(d.items);
+    renderPager('lPager', 'logs');
+    stamp();
+  } catch (e) { toast('日志加载失败：' + e.message, 'err'); }
+}
+
+function renderLogs(rows) {
+  const wrap = document.getElementById('logWrap');
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的记录</div>'; return; }
+  wrap.innerHTML = `<table>
+    <thead><tr><th>时间</th><th>路径</th><th>状态</th><th>耗时</th><th>密钥</th><th>用户</th></tr></thead>
+    <tbody>${rows.map((l) => `<tr>
+      <td class="cell-sub">${SD.fmtTime(l.ts)}</td>
+      <td class="mono">${esc(l.path)}</td>
+      <td><span class="code-chip ${l.status < 300 ? 'c-ok' : l.status < 400 ? 'c-info' : l.status < 500 ? 'c-warn' : 'c-err'}">${l.status}</span></td>
+      <td class="mono ${l.latency_ms > 1000 ? 'txt-warn' : ''}">${l.latency_ms} ms</td>
+      <td class="mono cell-sub">${l.key_masked || '—'}</td>
+      <td class="cell-sub">${esc(l.user_email || '—')}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+/* ---------- 套餐管理 ---------- */
+async function loadAdminPlans(reload) {
+  try {
+    const r = await SD.api('/admin/plans');
+    const items = (r.data || {}).items || [];
+    state.plans = items;
+    renderAdminPlans(items);
+    renderTierFilter();
+    document.getElementById('planBadge').textContent = items.length;
+    document.getElementById('kpiPlans').textContent = items.length;
+    const pub = items.filter((p) => p.is_public && p.is_active).length;
+    document.getElementById('kpiPlansSub').innerHTML =
+      `公开在售 <b>${pub}</b> · 隐藏 ${items.length - pub}`;
+    stamp();
+  } catch (e) {
+    toast('套餐加载失败：' + e.message, 'err');
+    /* 接口挂了也要让下拉框可用，用内置三档兜底 */
+    state.plans = [];
+    renderTierFilter();
+  }
+}
+
+/* 用户管理的套餐筛选下拉，选项跟着库里的套餐走 */
+function renderTierFilter() {
+  const sel = document.getElementById('uTier');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">全部套餐</option>' +
+    planList().map((p) => `<option value="${esc(p.code)}">${esc(p.name)}</option>`).join('');
+  sel.value = cur;
+}
+
+function renderAdminPlans(rows) {
+  const wrap = document.getElementById('planWrap');
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">还没有套餐</div>'; return; }
+  wrap.innerHTML = `<div class="src-grid">${rows.map((p) => {
+    const isFree = p.price_month === 0 && p.price_year === 0;
+    const state_ = p.is_active ? (p.is_public ? 'is-ok' : 'is-idle') : 'is-warn';
+    return `<div class="src-card ${state_}">
+      <div class="src-top">
+        <div class="src-name">${esc(p.name)}</div>
+        <span class="status ${p.is_active ? 'ok' : 'partial'}">${p.is_active ? '在售' : '已停用'}</span>
+      </div>
+      <div class="src-code mono">${esc(p.code)} · L${p.level}</div>
+      <div class="src-metrics">
+        <div><span>月付</span><b class="mono">${isFree ? '免费' : '¥' + yuan(p.price_month)}</b></div>
+        <div><span>年付</span><b class="mono">${isFree ? '免费' : '¥' + yuan(p.price_year)}</b></div>
+        <div><span>Key 上限</span><b class="mono">${p.max_keys}</b></div>
+        <div><span>限流</span><b class="mono">${p.rate_limit}/min</b></div>
+        <div><span>日配额</span><b class="mono">${p.daily_quota < 0 ? '不限' : nfmt(p.daily_quota)}</b></div>
+        <div><span>在用用户</span><b class="mono">${nfmt(p.users || 0)}</b></div>
+      </div>
+      ${(p.features || []).length
+        ? `<div class="src-err" style="background:transparent;color:var(--text-dim);border:0;padding:6px 0 0">
+             ${(p.features || []).slice(0, 3).map(esc).join(' · ')}</div>`
+        : ''}
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick='openPlanEditor(${JSON.stringify(p.code)})'>编辑</button>
+        <button class="btn btn-ghost btn-sm" onclick="togglePlan('${esc(p.code)}', ${!p.is_active})">
+          ${p.is_active ? '停用' : '启用'}</button>
+        ${p.code === 'free' ? '' :
+          `<button class="btn btn-danger btn-sm" onclick="delPlan('${esc(p.code)}', ${p.users || 0})">删除</button>`}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function openPlanEditor(code) {
+  const p = code ? planOf(code) : null;
+  const v = p || {
+    code: '', name: '', level: 0, price_month: 0, price_year: 0,
+    max_keys: 3, rate_limit: 60, daily_quota: 1000, description: '',
+    features: [], is_public: true, is_active: true, sort_order: 99,
+  };
+  openModal(p ? `编辑套餐 · ${p.name}` : '新建套餐', `
+    <div class="form-row">
+      <div class="field"><label>套餐代码（英文小写，等于 users.tier）</label>
+        <input id="plCode" value="${esc(v.code)}" placeholder="如 team" ${p ? 'disabled' : ''} autocomplete="off"></div>
+      <div class="field"><label>套餐名称</label>
+        <input id="plName" value="${esc(v.name)}" placeholder="如 团队版" autocomplete="off"></div>
+      <div class="field"><label>层级（越大越高，决定升级方向）</label>
+        <input id="plLevel" type="number" value="${v.level}" autocomplete="off"></div>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <div class="field"><label>月付价格（元）</label>
+        <input id="plMonth" type="number" step="0.01" value="${(v.price_month / 100).toFixed(2)}" autocomplete="off"></div>
+      <div class="field"><label>年付价格（元）</label>
+        <input id="plYear" type="number" step="0.01" value="${(v.price_year / 100).toFixed(2)}" autocomplete="off"></div>
+      <div class="field"><label>排序</label>
+        <input id="plSort" type="number" value="${v.sort_order}" autocomplete="off"></div>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <div class="field"><label>API Key 上限</label>
+        <input id="plKeys" type="number" value="${v.max_keys}" autocomplete="off"></div>
+      <div class="field"><label>限流（次/分钟）</label>
+        <input id="plRate" type="number" value="${v.rate_limit}" autocomplete="off"></div>
+      <div class="field"><label>日调用配额（-1 不限）</label>
+        <input id="plQuota" type="number" value="${v.daily_quota}" autocomplete="off"></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>卖点（每行一条）</label>
+      <textarea id="plFeats" rows="4" style="width:100%;background:var(--bg-soft);
+        border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);
+        font-family:inherit">${esc((v.features || []).join('\n'))}</textarea></div>
+    <div class="field" style="margin-top:12px"><label>简介</label>
+      <input id="plDesc" value="${esc(v.description || '')}" placeholder="一句话说明" autocomplete="off"></div>
+    <div style="display:flex;gap:18px;margin-top:14px;font-size:14px">
+      <label style="display:flex;gap:7px;align-items:center">
+        <input type="checkbox" id="plPublic" ${v.is_public ? 'checked' : ''}> 在用户端展示
+      </label>
+      <label style="display:flex;gap:7px;align-items:center">
+        <input type="checkbox" id="plActive" ${v.is_active ? 'checked' : ''}> 允许新购
+      </label>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:18px"
+      onclick="submitPlan(${p ? JSON.stringify(p.code) : 'null'})">保存</button>
+    <div class="panel-note" style="margin-top:10px">
+      价格与配额保存后<b>立即生效</b>：新密钥按新限流创建，配额超限会即时拦截。
+    </div>`);
+}
+
+async function submitPlan(code) {
+  const body = {
+    name: document.getElementById('plName').value.trim(),
+    level: parseInt(document.getElementById('plLevel').value) || 0,
+    price_month: centsOf(document.getElementById('plMonth').value),
+    price_year: centsOf(document.getElementById('plYear').value),
+    max_keys: parseInt(document.getElementById('plKeys').value) || 3,
+    rate_limit: parseInt(document.getElementById('plRate').value) || 60,
+    daily_quota: parseInt(document.getElementById('plQuota').value),
+    sort_order: parseInt(document.getElementById('plSort').value) || 0,
+    features: document.getElementById('plFeats').value.split('\n').map((s) => s.trim()).filter(Boolean),
+    description: document.getElementById('plDesc').value.trim(),
+    is_public: document.getElementById('plPublic').checked,
+    is_active: document.getElementById('plActive').checked,
+  };
+  if (!body.name) { toast('请填写套餐名称', 'err'); return; }
+  if (isNaN(body.daily_quota)) { toast('日调用配额必须是数字（-1 表示不限）', 'err'); return; }
+  try {
+    if (code) {
+      await SD.api(`/admin/plans/${code}`, { method: 'PUT', body: JSON.stringify(body) });
+      toast('套餐已更新，配额即时生效');
+    } else {
+      body.code = document.getElementById('plCode').value.trim();
+      await SD.api('/admin/plans', { method: 'POST', body: JSON.stringify(body) });
+      toast('套餐已创建');
+    }
+    closeModal();
+    loadAdminPlans();
+    if (state.view === 'users') loadUsers();
+    loadStats();
+  } catch (e) { toast('保存失败：' + e.message, 'err'); }
+}
+
+async function togglePlan(code, isActive) {
+  try {
+    await SD.api(`/admin/plans/${code}`, {
+      method: 'PUT', body: JSON.stringify({ is_active: isActive }),
+    });
+    toast(isActive ? '套餐已启用' : '套餐已停用（已购用户保留权益）');
+    loadAdminPlans();
+  } catch (e) { toast('操作失败：' + e.message, 'err'); }
+}
+
+async function delPlan(code, users) {
+  if (users) {
+    toast(`还有 ${users} 个用户在使用该套餐，请先把他们迁移到其他套餐`, 'err');
+    return;
+  }
+  if (!confirm(`确定删除套餐 ${code} 吗？该操作不可恢复。`)) return;
+  try {
+    await SD.api(`/admin/plans/${code}`, { method: 'DELETE' });
+    toast('套餐已删除');
+    loadAdminPlans();
+  } catch (e) { toast('删除失败：' + e.message, 'err'); }
+}
+
+/* ---------- 订单与账单 ---------- */
+async function loadAdminOrders() {
+  const s = state.orders;
+  const q = document.getElementById('oQ').value.trim();
+  const qs = new URLSearchParams({
+    offset: s.offset, limit: s.limit,
+    kind: document.getElementById('oKind').value,
+    status: document.getElementById('oStatus').value,
+    ...(q ? { q } : {}),
+  });
+  try {
+    const r = await SD.api('/admin/orders?' + qs.toString());
+    const d = r.data || {};
+    s.total = d.total || 0;
+    document.getElementById('oCount').innerHTML =
+      `共 ${s.total} 笔 · 已收 <b>¥${yuan(d.paid_amount)}</b>`;
+    document.getElementById('orderBadge').textContent = s.total;
+    renderAdminOrders(d.items || []);
+    renderPager('oPager', 'orders');
+    stamp();
+  } catch (e) { toast('订单加载失败：' + e.message, 'err'); }
+}
+
+function renderAdminOrders(rows) {
+  const wrap = document.getElementById('orderWrap');
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的订单</div>'; return; }
+  wrap.innerHTML = `<table>
+    <thead><tr><th>订单号</th><th>用户</th><th>类型</th><th>金额</th>
+      <th>渠道</th><th>状态</th><th>下单时间</th><th style="text-align:right">操作</th></tr></thead>
+    <tbody>${rows.map((o) => `<tr>
+      <td class="mono" style="font-size:12.5px">${esc(o.order_no)}</td>
+      <td class="cell-sub">${esc(o.user_email || o.user_id)}</td>
+      <td>${esc(o.kind_label || o.kind)}</td>
+      <td class="mono"><b>¥${esc(o.amount_yuan)}</b></td>
+      <td class="cell-sub">${o.pay_channel === 'mock' ? '模拟支付'
+          : o.pay_channel === 'manual' ? '线下转账'
+          : o.pay_channel === 'balance' ? '余额' : esc(o.pay_channel)}</td>
+      <td>${o.status === 'paid' ? '<span class="status ok">已支付</span>'
+          : o.status === 'pending' ? '<span class="status partial">待支付</span>'
+          : '<span class="cell-sub">' + esc(o.status_label || o.status) + '</span>'}</td>
+      <td class="cell-sub">${SD.fmtTime(o.created_at)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        ${o.status === 'pending'
+          ? `<button class="btn btn-primary btn-sm" onclick="confirmOrder('${esc(o.order_no)}')">确认到账</button>
+             <button class="btn btn-ghost btn-sm" onclick="cancelAdminOrder('${esc(o.order_no)}')">取消</button>`
+          : o.paid_at ? `<span class="cell-sub">${SD.fmtTime(o.paid_at)}</span>` : ''}
+      </td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+async function confirmOrder(no) {
+  if (!confirm(`确认订单 ${no} 已收到款项？\n\n余额会立即增加，操作不可撤销。`)) return;
+  try {
+    const r = await SD.api(`/admin/orders/${no}/confirm`, { method: 'POST' });
+    toast(r.msg || '已确认到账');
+    loadAdminOrders(); loadStats();
+  } catch (e) { toast('确认失败：' + e.message, 'err'); }
+}
+
+async function cancelAdminOrder(no) {
+  if (!confirm(`确定取消订单 ${no} 吗？`)) return;
+  try {
+    await SD.api(`/admin/orders/${no}/cancel`, { method: 'POST' });
+    toast('订单已取消');
+    loadAdminOrders();
+  } catch (e) { toast('取消失败：' + e.message, 'err'); }
+}
+
+async function loadAdminBills() {
+  const s = state.bills;
+  const qs = new URLSearchParams({
+    offset: s.offset, limit: s.limit, type: document.getElementById('bType').value,
+  });
+  try {
+    const r = await SD.api('/admin/bills?' + qs.toString());
+    const d = r.data || {};
+    s.total = d.total || 0;
+    renderAdminBills(d.items || []);
+    renderPager('bPager', 'bills');
+  } catch (e) { toast('流水加载失败：' + e.message, 'err'); }
+}
+
+function renderAdminBills(rows) {
+  const wrap = document.getElementById('billWrap');
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的流水</div>'; return; }
+  wrap.innerHTML = `<table>
+    <thead><tr><th>时间</th><th>用户 ID</th><th>类型</th><th>关联订单</th>
+      <th>变动</th><th>变动后余额</th><th>备注</th></tr></thead>
+    <tbody>${rows.map((b) => `<tr>
+      <td class="cell-sub">${SD.fmtTime(b.created_at)}</td>
+      <td class="mono">#${b.user_id}</td>
+      <td>${esc(b.type_label || b.type)}</td>
+      <td class="mono cell-sub">${esc(b.ref || '—')}</td>
+      <td class="${b.amount >= 0 ? 'txt-up' : 'txt-down'} mono">
+        ${b.amount >= 0 ? '+' : '-'}¥${esc(b.amount_yuan)}</td>
+      <td class="mono">¥${esc(b.balance_after_yuan)}</td>
+      <td class="cell-sub">${esc(b.remark || '')}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+/* ---------- 分页 ---------- */
+/* 用 state 的键名（而不是函数名）定位，避免压缩后函数名变化导致翻页失效 */
+const VIEW_STATE = {
+  users: loadUsers, keys: loadKeys, logs: loadLogs,
+  orders: loadAdminOrders, bills: loadAdminBills,
+};
+
+/* 切换筛选条件时必须回到第一页，否则会出现"第 3 页但只有 2 条" */
+function resetP(stateKey, fn) {
+  state[stateKey].offset = 0;
+  fn();
+}
+
+function renderPager(id, stateKey) {
+  const s = state[stateKey];
+  const el = document.getElementById(id);
+  const pages = Math.max(1, Math.ceil(s.total / s.limit));
+  const cur = Math.floor(s.offset / s.limit) + 1;
+  el.innerHTML = `
+    <span class="pager-info">第 ${cur} / ${pages} 页 · 每页 ${s.limit} 条</span>
+    <div class="pager-btns">
+      <button class="btn btn-ghost btn-sm" ${s.offset <= 0 ? 'disabled' : ''} onclick="goPage('${stateKey}', ${s.offset - s.limit})">上一页</button>
+      <button class="btn btn-ghost btn-sm" ${cur >= pages ? 'disabled' : ''} onclick="goPage('${stateKey}', ${s.offset + s.limit})">下一页</button>
+    </div>`;
+}
+
+function goPage(stateKey, offset) {
+  const s = state[stateKey];
+  s.offset = Math.max(0, offset);
+  VIEW_STATE[stateKey]();
+}
+
+/* ---------- 弹窗 ---------- */
+function openModal(title, html) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalMask').classList.remove('hidden');
+}
+function closeModal() {
+  document.getElementById('modalMask').classList.add('hidden');
+}
+document.getElementById('modalMask').onclick = (e) => {
+  if (e.target.id === 'modalMask') closeModal();
+};
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+/* ---------- 时间戳 ---------- */
+function stamp() {
+  document.getElementById('lastUpdated').textContent =
+    '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+}
+
+/* ---------- 自动刷新 ---------- */
+function setupAuto() {
+  clearInterval(autoTimer);
+  const on = document.getElementById('autoChk').checked;
+  if (!on) return;
+  autoTimer = setInterval(() => {
+    if (state.view === 'overview') loadStats();
+    else if (state.view === 'sources') { loadSources(); stamp(); }
+  }, 60000);
+}
+document.getElementById('autoChk').onchange = setupAuto;
+
+/* ---------- 启动 ---------- */
+(async function boot() {
+  if (!SD.token) return;
+  try {
+    const r = await SD.api('/auth/me');
+    ME = r.data;
+    document.getElementById('adminMe').textContent = ME.email;
+    if (!ME.is_admin) {
+      document.getElementById('permBox').innerHTML =
+        '<div class="alert alert-err">当前账号不是管理员，无法访问后台数据。</div>';
+    }
+  } catch (e) {
+    document.getElementById('adminMe').textContent = '未登录';
+  }
+  /* 套餐要先拉好：用户管理的套餐下拉与筛选框都依赖它，
+     否则第一次进「用户管理」时下拉框是空的 */
+  await loadAdminPlans();
+  switchView('overview');
+  setupAuto();
+})();
+</script>
+</body>
+</html>

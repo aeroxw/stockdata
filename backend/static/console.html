@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>控制台 — StockData</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .layout { display: grid; grid-template-columns: 224px 1fr; gap: 26px; align-items: start; }
+  .side {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 14px; position: sticky; top: 86px;
+  }
+  .side-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 13px;
+    border-radius: 9px; font-size: 14.5px; color: var(--text-dim);
+    transition: all .18s; margin-bottom: 3px; cursor: pointer; text-decoration: none;
+  }
+  .side-item:hover { background: rgba(61,125,255,.10); color: var(--text); }
+  .side-item.active { background: rgba(61,125,255,.14); color: var(--text); font-weight: 600; }
+  .side-ico { width: 20px; text-align: center; font-size: 15px; }
+  .side-sep { height: 1px; background: var(--border); margin: 11px 0; }
+
+  /* 顶栏信息条 */
+  .cs-top {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--radius-lg);
+    background: var(--surface); margin-bottom: 20px;
+  }
+  .cs-top .who { font-weight: 600; font-size: 15px; }
+  .cs-top .mail { color: var(--muted); font-size: 13.5px; }
+  .cs-bal { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .cs-bal .num { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+  .cs-bal .unit { color: var(--muted); font-size: 13px; }
+
+  /* 套餐卡片 */
+  .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 16px; }
+  .plan-card {
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    background: var(--surface); padding: 20px; display: flex; flex-direction: column;
+    transition: all .2s; position: relative; overflow: hidden;
+  }
+  .plan-card:hover { border-color: var(--brand); transform: translateY(-2px); }
+  .plan-card.current { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(61,125,255,.14); }
+  .plan-card .pname { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .plan-card .pdesc { color: var(--muted); font-size: 13px; margin-top: 6px; min-height: 34px; }
+  .plan-price { margin: 14px 0 4px; display: flex; align-items: baseline; gap: 4px; }
+  .plan-price .cur { font-size: 16px; color: var(--text-dim); }
+  .plan-price .val { font-size: 32px; font-weight: 800; font-family: var(--mono); }
+  .plan-price .per { color: var(--muted); font-size: 13px; }
+  .plan-price .year-note { color: var(--ok); font-size: 12.5px; margin-left: 6px; }
+  .plan-feats { list-style: none; margin: 14px 0 18px; padding: 0; flex: 1; }
+  .plan-feats li { font-size: 13.5px; color: var(--text-dim); padding: 4px 0 4px 20px; position: relative; }
+  .plan-feats li::before { content: '✓'; position: absolute; left: 0; color: var(--ok); font-weight: 700; }
+  .plan-flag {
+    position: absolute; top: 14px; right: 14px; font-size: 11.5px; font-weight: 700;
+    padding: 3px 9px; border-radius: 20px; background: rgba(61,125,255,.14); color: var(--brand);
+  }
+  .plan-flag.cur { background: rgba(22,199,132,.14); color: var(--ok); }
+
+  /* 充值 */
+  .rc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px; }
+  .rc-opt {
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; text-align: center;
+    cursor: pointer; transition: all .16s; background: var(--bg-soft);
+  }
+  .rc-opt:hover { border-color: var(--brand); }
+  .rc-opt.sel { border-color: var(--brand); background: rgba(61,125,255,.10); }
+  .rc-opt .amt { font-size: 18px; font-weight: 700; font-family: var(--mono); }
+  .rc-opt .tip { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+
+  /* 月付/年付切换 */
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  .seg button {
+    padding: 7px 16px; font-size: 13.5px; background: transparent; color: var(--text-dim);
+    border: 0; cursor: pointer; font-family: inherit;
+  }
+  .seg button.on { background: var(--brand); color: #fff; font-weight: 600; }
+
+  /* 配额进度条 */
+  .q-row { margin-bottom: 14px; }
+  .q-head { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 6px; }
+  .q-head .v { color: var(--muted); font-family: var(--mono); font-size: 12.5px; }
+  .q-track { height: 8px; border-radius: 6px; background: var(--bg-soft); overflow: hidden; }
+  .q-fill { height: 100%; border-radius: 6px; background: var(--brand); transition: width .4s; }
+  .q-fill.warn { background: var(--warn); }
+  .q-fill.full { background: var(--err); }
+
+  .view { display: none; }
+  .view.on { display: block; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    font-size: 12px; padding: 4px 10px; border-radius: 20px;
+    background: var(--bg-soft); border: 1px solid var(--border); color: var(--text-dim);
+  }
+  .chip.on { border-color: var(--brand); color: var(--brand); background: rgba(61,125,255,.10); }
+  /* 到期相关：临期用琥珀色警示，已过期用红色 */
+  .chip.warn { border-color: rgba(255,184,77,.45); color: #ffb84d; background: rgba(255,184,77,.12); }
+  .chip.danger { border-color: rgba(255,92,92,.5); color: #ff6b6b; background: rgba(255,92,92,.14); }
+
+  /* 套餐页顶部横幅：试用 / 临期 / 已过期三种状态共用 */
+  .banner {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    padding: 12px 16px; border-radius: 10px; margin-bottom: 16px;
+    font-size: 13.5px; line-height: 1.6;
+  }
+  .banner b { font-size: 14px; }
+  .banner span { color: var(--text-dim); }
+  .banner.warn {
+    background: rgba(255,184,77,.10); border: 1px solid rgba(255,184,77,.30); color: #ffb84d;
+  }
+  .banner.danger {
+    background: rgba(255,92,92,.10); border: 1px solid rgba(255,92,92,.32); color: #ff6b6b;
+  }
+  .money-in { color: var(--up); font-family: var(--mono); font-weight: 600; }
+  .money-out { color: var(--down); font-family: var(--mono); font-weight: 600; }
+  .tb-scroll { overflow-x: auto; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .side { position: static; display: flex; flex-wrap: wrap; gap: 6px; }
+    .side-sep { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="/">
+      <div class="logo-mark">S</div>
+      <div>StockData <span>金融数据平台</span></div>
+    </a>
+    <div class="nav-links" style="margin-left:auto">
+      <a href="/docs.html">开发文档</a>
+      <a href="#" id="logoutBtn">退出</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="container">
+    <div class="page-head">
+      <div class="page-title">控制台</div>
+      <div class="page-sub" id="userInfo">加载中…</div>
+    </div>
+
+    <!-- 顶栏信息条 -->
+    <div class="cs-top">
+      <div>
+        <div class="who" id="topName">—</div>
+        <div class="mail" id="topMail">—</div>
+      </div>
+      <span class="tier-pill" id="topTier">—</span>
+      <span class="chip" id="topExpire">—</span>
+      <div class="cs-bal">
+        <div>
+          <div style="font-size:12px;color:var(--muted);text-align:right">账户余额</div>
+          <div><span class="unit">¥</span> <span class="num" id="topBalance">0.00</span></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="go('plan')">充值 / 升级</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <!-- 侧栏 -->
+      <aside class="side">
+        <div class="side-item active" data-view="overview" onclick="go('overview')">
+          <span class="side-ico">📊</span>概览
+        </div>
+        <div class="side-item" data-view="keys" onclick="go('keys')">
+          <span class="side-ico">🔑</span>API 密钥
+        </div>
+        <div class="side-item" data-view="plan" onclick="go('plan')">
+          <span class="side-ico">💎</span>套餐与充值
+        </div>
+        <div class="side-item" data-view="bills" onclick="go('bills')">
+          <span class="side-ico">🧾</span>账单与订单
+        </div>
+        <div class="side-item" data-view="usage" onclick="go('usage')">
+          <span class="side-ico">📈</span>用量统计
+        </div>
+        <div class="side-sep"></div>
+        <a class="side-item" href="/docs.html"><span class="side-ico">📖</span>接口文档</a>
+        <div class="side-item" id="adminEntry" style="display:none" onclick="location.href='/admin.html'">
+          <span class="side-ico">⚙️</span>管理后台
+        </div>
+        <div class="side-item" id="logoutSide"><span class="side-ico">🚪</span>退出登录</div>
+      </aside>
+
+      <!-- 主区 -->
+      <main>
+        <div id="msgBox"></div>
+
+        <!-- ==================== 概览 ==================== -->
+        <section class="view on" id="view-overview">
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-label">当前套餐</div>
+              <div class="stat-value" id="ovPlan" style="font-size:24px">-</div>
+              <div class="stat-sub" id="ovPlanSub">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">账户余额</div>
+              <div class="stat-value" id="ovBalance">¥0.00</div>
+              <div class="stat-sub">可用于升级与续费</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">今日调用</div>
+              <div class="stat-value" id="ovCalls">0</div>
+              <div class="stat-sub" id="ovQuota">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">活跃密钥</div>
+              <div class="stat-value" id="ovKeys">0</div>
+              <div class="stat-sub" id="ovKeysSub">-</div>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <div class="panel">
+              <div class="panel-head"><div class="panel-title">配额使用情况</div></div>
+              <div style="padding:4px 0">
+                <div class="q-row">
+                  <div class="q-head"><span>今日调用</span><span class="v" id="q1v">-</span></div>
+                  <div class="q-track"><div class="q-fill" id="q1" style="width:0%"></div></div>
+                </div>
+                <div class="q-row">
+                  <div class="q-head"><span>API 密钥</span><span class="v" id="q2v">-</span></div>
+                  <div class="q-track"><div class="q-fill" id="q2" style="width:0%"></div></div>
+                </div>
+                <div class="q-row">
+                  <div class="q-head"><span>单密钥限流</span><span class="v" id="q3v">-</span></div>
+                  <div class="q-track"><div class="q-fill" id="q3" style="width:0%"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head"><div class="panel-title">套餐权益</div></div>
+              <div class="kv-list" id="ovBenefits"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div class="panel-title">快速接入</div></div>
+            <div class="code-block">
+              <div class="code-head">
+                <span class="code-dot" style="background:#ff5f56"></span>
+                <span class="code-dot" style="background:#ffbd2e"></span>
+                <span class="code-dot" style="background:#27c93f"></span>
+                <span class="code-lang">cURL</span>
+              </div>
+              <div class="code-body">curl "<span id="hostSpan"></span>/api/v1/quote?codes=600519.SH" \
+  -H "Authorization: Bearer <span style="color:var(--warn)">你的密钥</span>"</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== API 密钥 ==================== -->
+        <section class="view" id="view-keys">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">API 密钥
+                <span class="panel-note" id="keysNote"></span>
+              </div>
+              <button class="btn btn-primary btn-sm" id="createBtn">+ 创建新密钥</button>
+            </div>
+            <div class="tb-scroll"><div id="keyTableWrap"><div class="empty">加载中…</div></div></div>
+          </div>
+
+          <div class="panel" id="createPanel" style="display:none">
+            <div class="panel-head"><div class="panel-title">创建新密钥</div></div>
+            <div class="form-row">
+              <div class="field">
+                <label>密钥名称</label>
+                <input id="kName" placeholder="如：生产环境 / 回测脚本">
+              </div>
+              <div class="field">
+                <label>限流（次/分钟，留空按套餐默认）</label>
+                <input id="kLimit" type="number" min="1" max="100000" placeholder="默认">
+              </div>
+              <div class="field">
+                <label>有效期（天，留空永久）</label>
+                <input id="kExpire" type="number" placeholder="如 90" min="1">
+              </div>
+            </div>
+            <div class="field" style="margin-top:18px">
+              <label>权限范围</label>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:6px">
+                <label style="display:flex;gap:7px;align-items:center;font-size:14px">
+                  <input type="checkbox" class="kScope" value="quote" checked> quote（行情快照）
+                </label>
+                <label style="display:flex;gap:7px;align-items:center;font-size:14px">
+                  <input type="checkbox" class="kScope" value="kline" checked> kline（K 线）
+                </label>
+                <label style="display:flex;gap:7px;align-items:center;font-size:14px">
+                  <input type="checkbox" class="kScope" value="special"> special（特色数据）
+                </label>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:22px">
+              <button class="btn btn-primary" id="submitCreate">确认创建</button>
+              <button class="btn btn-ghost" id="cancelCreate">取消</button>
+            </div>
+          </div>
+
+          <div class="panel" id="secretPanel" style="display:none">
+            <div class="panel-head"><div class="panel-title">🔐 密钥已生成</div></div>
+            <div class="secret-box"><div class="mono" id="secretText"></div></div>
+            <div class="secret-warn">
+              ⚠️ 这是唯一一次显示完整密钥的机会，请立即复制并妥善保存。关闭后无法再次查看。
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn btn-primary btn-sm" id="copySecret">复制密钥</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 套餐与充值 ==================== -->
+        <section class="view" id="view-plan">
+          <div class="banner" id="planBanner" style="display:none"></div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">选择套餐</div>
+              <div style="display:flex;align-items:center;gap:12px">
+                <span class="chip" id="planNote">—</span>
+                <div class="seg">
+                  <button id="segMonth" class="on" onclick="setPeriod('month')">月付</button>
+                  <button id="segYear" onclick="setPeriod('year')">年付 · 省 2 个月</button>
+                </div>
+              </div>
+            </div>
+            <div class="plan-grid" id="planGrid"><div class="empty">加载中…</div></div>
+          </div>
+
+          <div class="two-col">
+            <div class="panel">
+              <div class="panel-head"><div class="panel-title">账户充值</div></div>
+              <div class="rc-grid" id="rcGrid"></div>
+              <div class="form-row" style="margin-top:16px">
+                <div class="field">
+                  <label>自定义金额（元）</label>
+                  <input id="rcCustom" type="number" min="1" step="1" placeholder="如 256">
+                </div>
+                <div class="field">
+                  <label>支付方式</label>
+                  <select id="rcChannel" class="tb-select">
+                    <option value="manual">线下转账（后台确认到账）</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-top:18px;display:flex;gap:12px;align-items:center">
+                <button class="btn btn-primary" id="rcSubmit">立即充值</button>
+                <span style="font-size:13px;color:var(--muted)" id="rcHint">请选择金额</span>
+              </div>
+              <div id="onlineTip" style="display:none;margin-top:12px;padding:10px 12px;
+                   border-radius:8px;background:rgba(255,184,77,.10);
+                   border:1px solid rgba(255,184,77,.28);font-size:12.5px;color:var(--muted)">
+                在线支付（微信 / 支付宝）尚未开通，目前仅支持线下转账。
+                商户参数配置完成后此处会自动出现扫码支付入口。
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <div class="panel-title">待支付订单</div>
+                <button class="btn btn-ghost btn-sm" onclick="loadOrders()">刷新</button>
+              </div>
+              <div class="tb-scroll"><div id="pendingWrap"><div class="empty">加载中…</div></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 账单与订单 ==================== -->
+        <section class="view" id="view-bills">
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-label">累计充值</div>
+              <div class="stat-value" id="billIncome">¥0.00</div>
+              <div class="stat-sub">含平台赠送</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">累计消费</div>
+              <div class="stat-value" id="billOutcome">¥0.00</div>
+              <div class="stat-sub">套餐购买与续费</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">当前余额</div>
+              <div class="stat-value" id="billBalance">¥0.00</div>
+              <div class="stat-sub">可随时用于升级</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">余额流水</div>
+              <div class="toolbar">
+                <select class="tb-select" id="billType" onchange="resetPage('bills', loadBills)">
+                  <option value="all">全部类型</option>
+                  <option value="recharge">充值入账</option>
+                  <option value="consume">套餐消费</option>
+                  <option value="grant">平台赠送</option>
+                  <option value="deduct">平台扣减</option>
+                </select>
+                <span class="tb-count" id="billCount">—</span>
+              </div>
+            </div>
+            <div class="tb-scroll"><div id="billWrap"><div class="empty">加载中…</div></div></div>
+            <div class="pager" id="billPager"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">我的订单</div>
+              <div class="toolbar">
+                <select class="tb-select" id="orderStatus" onchange="resetPage('orders', loadOrderList)">
+                  <option value="all">全部状态</option>
+                  <option value="pending">待支付</option>
+                  <option value="paid">已支付</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+                <span class="tb-count" id="orderCount">—</span>
+              </div>
+            </div>
+            <div class="tb-scroll"><div id="orderWrap"><div class="empty">加载中…</div></div></div>
+            <div class="pager" id="orderPager"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 用量统计 ==================== -->
+        <section class="view" id="view-usage">
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-label">今日调用</div>
+              <div class="stat-value" id="us24">0</div>
+              <div class="stat-sub" id="us24sub">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">近 7 天</div>
+              <div class="stat-value" id="us7">0</div>
+              <div class="stat-sub">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">累计调用</div>
+              <div class="stat-value" id="usAll">0</div>
+              <div class="stat-sub">注册至今</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">错误率</div>
+              <div class="stat-value" id="usErr">0%</div>
+              <div class="stat-sub" id="usErrSub">-</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">近 14 天调用趋势</div>
+              <div class="toolbar">
+                <select class="tb-select" id="usDays" onchange="loadUsage()">
+                  <option value="7">7 天</option>
+                  <option value="14" selected>14 天</option>
+                  <option value="30">30 天</option>
+                </select>
+              </div>
+            </div>
+            <div id="usChart"><div class="empty">加载中…</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div class="panel-title">调用最多的接口</div></div>
+            <div id="usTop"><div class="empty">加载中…</div></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 弹窗 / Toast ============ -->
+<div class="modal-mask hidden" id="modalMask">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">确认</div>
+      <button class="modal-close" onclick="closeModal()" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+<div class="toast-box" id="toastBox"></div>
+
+<!-- 扫码支付收银台：与上面的确认弹窗分开，因为它需要常驻显示二维码并轮询状态 -->
+<div id="payModal" style="display:none;position:fixed;inset:0;z-index:200;
+     align-items:center;justify-content:center;background:rgba(6,10,20,.72)">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;
+       padding:26px 30px;max-width:380px;width:92%;text-align:center">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">扫码支付</div>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:16px">
+      请使用微信或支付宝扫码完成支付
+    </div>
+    <div id="payQr" style="background:#fff;border-radius:10px;padding:10px;
+         display:inline-block;line-height:0"></div>
+    <div id="payInfo" style="margin-top:14px;font-size:13.5px"></div>
+    <div id="payTip" style="margin-top:10px;font-size:12.5px;color:var(--muted)">
+      支付完成后页面会自动刷新余额，请勿关闭
+    </div>
+    <button class="btn btn-ghost" style="margin-top:18px;width:100%"
+            onclick="closePayDialog()">取消支付</button>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+/* ============================================================
+   用户控制台
+   五个视图：概览 / API 密钥 / 套餐与充值 / 账单与订单 / 用量统计
+   ============================================================ */
+
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const nfmt = (n) => Number(n || 0).toLocaleString('zh-CN');
+
+function toast(msg, type = 'ok') {
+  const box = document.getElementById('toastBox');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => el.classList.add('toast-out'), 3200);
+  setTimeout(() => el.remove(), 3800);
+}
+
+function openModal(title, html) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalMask').classList.remove('hidden');
+}
+function closeModal() { document.getElementById('modalMask').classList.add('hidden'); }
+document.getElementById('modalMask').onclick = (e) => {
+  if (e.target.id === 'modalMask') closeModal();
+};
+
+/* 确认弹窗：返回 Promise<boolean>，避免到处写 window.confirm */
+function confirmBox(title, html, okText = '确定') {
+  return new Promise((resolve) => {
+    openModal(title, `
+      <div style="font-size:14px;line-height:1.7">${html}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-ghost" id="cfNo">取消</button>
+        <button class="btn btn-primary" id="cfYes">${esc(okText)}</button>
+      </div>`);
+    document.getElementById('cfNo').onclick = () => { closeModal(); resolve(false); };
+    document.getElementById('cfYes').onclick = () => { closeModal(); resolve(true); };
+  });
+}
+
+/* ---------- 登录态 ---------- */
+if (!SD.token) location.href = '/login.html';
+document.getElementById('logoutBtn').onclick = (e) => { e.preventDefault(); SD.logout(); };
+document.getElementById('logoutSide').onclick = () => SD.logout();
+document.getElementById('hostSpan').textContent = location.origin;
+
+/* ---------- 全局状态 ---------- */
+const state = {
+  view: 'overview',
+  period: 'month',
+  me: null,          // /billing/me
+  plans: [],         // /billing/plans
+  keys: [],
+  rechargeCents: 0,
+  bills: { offset: 0, limit: 20, total: 0 },
+  orders: { offset: 0, limit: 20, total: 0 },
+  usage: null,
+};
+
+const VIEWS = ['overview', 'keys', 'plan', 'bills', 'usage'];
+const LOADERS = {
+  overview: loadOverview,
+  keys: loadKeys,
+  plan: loadPlanView,
+  bills: loadBillsView,
+  usage: loadUsage,
+};
+
+/* 已经把「加载中…」换成真实内容的视图，避免来回切换时重复请求。
+   用 Set 而不是布尔标记，方便出错后允许重试。 */
+const LOADED = new Set();
+
+function go(view, force = false) {
+  if (!VIEWS.includes(view)) view = 'overview';
+  state.view = view;
+  document.querySelectorAll('.side-item[data-view]').forEach((el) => {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  document.querySelectorAll('.view').forEach((el) => {
+    el.classList.toggle('on', el.id === 'view-' + view);
+  });
+
+  // 刷新按钮 / 购买后回填等场景需要强制重拉
+  if (!force && LOADED.has(view)) return;
+
+  const fn = LOADERS[view];
+  if (!fn) return;
+  // 加载函数自己吞掉了异常，这里再兜一层：万一抛出来，必须把
+  // "加载中…" 换成错误提示，否则界面会永远卡在占位符上。
+  Promise.resolve()
+    .then(() => fn())
+    .then(() => { LOADED.add(view); })
+    .catch((e) => {
+      LOADED.delete(view);
+      markViewFailed(view, e);
+    });
+}
+
+/* 把某个视图里所有还停在「加载中…」的容器替换成错误提示，
+   这样用户至少能看到"出错了、点这里重试"，而不是无限转圈。 */
+function markViewFailed(view, err) {
+  const sec = document.getElementById('view-' + view);
+  if (!sec) return;
+  const msg = (err && err.message) || String(err);
+  let hit = 0;
+  sec.querySelectorAll('.empty').forEach((el) => {
+    const t = (el.textContent || '').trim();
+    if (t === '加载中…' || t === '加载中...') {
+      el.innerHTML = `${esc(msg)}
+        <div style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm" onclick="go('${view}', true)">重新加载</button>
+        </div>`;
+      hit += 1;
+    }
+  });
+  if (!hit) toast(msg, 'err');
+}
+
+/* ============================================================
+   概览
+   ============================================================ */
+async function loadOverview() {
+  // boot() 已经在进入页面时拉过一次顶栏，这里只在缺失时补拉，
+  // 避免同一个 /billing/me 被连打两次
+  if (!state.me) await loadMe();
+  await loadKeys();
+  try {
+    const r = await SD.api('/billing/usage?days=1');
+    const d = r.data || {};
+    const used = d.calls_24h || 0;
+    const quota = (d.quota || {}).daily_quota;
+    const unlimited = (d.quota || {}).unlimited;
+    document.getElementById('ovCalls').textContent = nfmt(used);
+    document.getElementById('ovQuota').textContent = unlimited
+      ? '不限量' : `配额 ${nfmt(quota)} / 天`;
+    setBar('q1', unlimited ? 0 : used, unlimited ? 0 : quota,
+      unlimited ? `${nfmt(used)} 次 · 不限量` : `${nfmt(used)} / ${nfmt(quota)}`);
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function loadMe() {
+  const [me, billing] = await Promise.all([
+    SD.api('/auth/me'),
+    SD.api('/billing/me'),
+  ]);
+  const u = me.data;
+  const b = billing.data || {};
+  state.me = b;
+  state.auth = u;
+
+  document.getElementById('userInfo').textContent = `${u.email} · ${u.tier.toUpperCase()}`;
+  document.getElementById('topMail').textContent = u.email;
+  document.getElementById('topName').textContent = u.email.split('@')[0];
+
+  const plan = b.plan || {};
+  const pill = document.getElementById('topTier');
+  pill.textContent = plan.name || u.tier;
+  pill.className = 'tier-pill tier-' + (u.tier || 'free');
+  document.getElementById('topBalance').textContent = b.balance_yuan || '0.00';
+
+  /* 到期时间：这是用户最关心也最容易看不到的一项，所以分三种情况给不同强度
+     —— 试用期给"体验剩余 N 天"（促成购买）、临期 7 天内高亮、已过期标红。 */
+  const exp = document.getElementById('topExpire');
+  const ent = b.entitlement || {};
+  if (b.plan_expires_at) {
+    const dateStr = b.plan_expires_at.slice(0, 10);
+    if (b.expired) {
+      exp.textContent = `${dateStr} 已到期 · 请续费`;
+      exp.className = 'chip danger';
+    } else if (ent.is_trial) {
+      exp.textContent = `试用期至 ${dateStr} · 剩 ${b.days_left} 天`;
+      exp.className = 'chip' + (b.days_left <= 7 ? ' on' : ' warn');
+    } else {
+      exp.textContent = `有效期至 ${dateStr} · 剩 ${b.days_left} 天`;
+      exp.className = 'chip' + (b.days_left <= 7 ? ' on' : '');
+    }
+  } else {
+    exp.textContent = '长期有效';
+    exp.className = 'chip';
+  }
+
+  /* 试用/临期/过期横幅：放在套餐页顶部，比一个小 chip 醒目得多 */
+  const banner = document.getElementById('planBanner');
+  if (banner) {
+    if (b.expired) {
+      banner.className = 'banner danger';
+      banner.innerHTML = `<b>${ent.is_trial ? '试用期已结束' : '套餐已到期'}</b>
+        <span>数据接口已暂停调用，续费后立即恢复。</span>`;
+      banner.style.display = 'flex';
+    } else if (ent.is_trial) {
+      banner.className = 'banner warn';
+      banner.innerHTML = `<b>新用户试用期</b>
+        <span>剩余 ${b.days_left} 天（至 ${b.plan_expires_at.slice(0, 10)}），
+        到期后数据接口将暂停调用，建议提前购买套餐。</span>`;
+      banner.style.display = 'flex';
+    } else if (b.days_left !== null && b.days_left <= 7) {
+      banner.className = 'banner warn';
+      banner.innerHTML = `<b>套餐即将到期</b>
+        <span>剩余 ${b.days_left} 天（${b.plan_expires_at.slice(0, 10)}），续费可顺延，不会损失已购天数。</span>`;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  if (u.is_admin) document.getElementById('adminEntry').style.display = 'flex';
+
+  // 概览卡片
+  document.getElementById('ovPlan').textContent = plan.name || u.tier;
+  document.getElementById('ovPlanSub').textContent = b.plan_expires_at
+    ? (b.expired ? '已过期' : `剩余 ${b.days_left} 天`)
+    : '永久有效';
+  document.getElementById('ovBalance').textContent = '¥' + (b.balance_yuan || '0.00');
+
+  const q = b.quota || {};
+  const usage = b.usage || {};
+  document.getElementById('ovKeys').textContent = usage.active_keys || 0;
+  document.getElementById('ovKeysSub').textContent = `上限 ${q.max_keys} 个`;
+  setBar('q2', usage.active_keys || 0, q.max_keys || 0,
+    `${usage.active_keys || 0} / ${q.max_keys}`);
+  /* 限流不是"已用量"，这里按 1200 次/分钟（旗舰版上限）做个能力刻度，
+     让用户直观看到自己套餐在整体体系里的位置 */
+  setBar('q3', q.rate_limit || 0, 1200, `${q.rate_limit} 次/分钟`);
+
+  const feats = plan.features || [];
+  /* 到期时间单独一行：以前只在顶部一个小 chip 里显示，用户根本注意不到 */
+  const expLine = b.plan_expires_at
+    ? `<div class="kv"><span>${ent.is_trial ? '试用期至' : '有效期至'}</span>
+         <b style="color:${b.expired ? '#ff6b6b' : (b.days_left <= 7 ? '#ffb84d' : 'inherit')}">
+           ${b.plan_expires_at.slice(0, 10)}
+           ${b.expired ? '（已到期）' : `（剩 ${b.days_left} 天）`}
+         </b></div>`
+    : `<div class="kv"><span>有效期</span><b>长期有效</b></div>`;
+
+  document.getElementById('ovBenefits').innerHTML = [
+    `<div class="kv"><span>套餐</span><b>${esc(plan.name || u.tier)}</b></div>`,
+    expLine,
+    `<div class="kv"><span>API Key 上限</span><b>${q.max_keys} 个</b></div>`,
+    `<div class="kv"><span>单密钥限流</span><b>${q.rate_limit} 次/分钟</b></div>`,
+    `<div class="kv"><span>每日调用</span><b>${q.unlimited ? '不限量' : nfmt(q.daily_quota) + ' 次'}</b></div>`,
+    ...feats.map((f) => `<div class="kv"><span>·</span><b>${esc(f)}</b></div>`),
+  ].join('');
+}
+
+function setBar(id, used, total, label) {
+  const el = document.getElementById(id);
+  const pct = total > 0 ? Math.min(100, Math.round(used / total * 100)) : 0;
+  el.style.width = pct + '%';
+  el.className = 'q-fill' + (pct >= 100 ? ' full' : pct >= 80 ? ' warn' : '');
+  const v = document.getElementById(id + 'v');
+  if (v) v.textContent = label;
+}
+
+/* ============================================================
+   API 密钥
+   ============================================================ */
+async function loadKeys() {
+  const wrap = document.getElementById('keyTableWrap');
+  try {
+    const r = await SD.api('/apikey');
+    const keys = r.data || [];
+    state.keys = keys;
+    const active = keys.filter((k) => k.is_active).length;
+    document.getElementById('keysNote').textContent =
+      `${active} 个生效中 / 共 ${keys.length} 个`;
+    /* 概览里的"活跃密钥"以 /billing/me 为准（那里同时给出上限），
+       这里不去覆盖，避免两个接口的数据互相打架 */
+
+    if (!keys.length) {
+      wrap.innerHTML = '<div class="empty">还没有 API 密钥，点击右上角创建一个吧</div>';
+      return;
+    }
+    wrap.innerHTML = `<table>
+      <thead><tr>
+        <th>名称</th><th>密钥</th><th>权限</th><th>限流</th>
+        <th>状态</th><th>调用</th><th>最后使用</th><th>操作</th>
+      </tr></thead>
+      <tbody>${keys.map((k) => `
+        <tr>
+          <td>${esc(k.name)}</td>
+          <td class="mono">${esc(k.masked)}</td>
+          <td>${(k.scopes || []).map(esc).join(', ')}</td>
+          <td>${k.rate_limit}/min</td>
+          <td>${k.is_active
+            ? '<span class="status ok">有效</span>'
+            : '<span class="status partial">已吊销</span>'}</td>
+          <td class="mono">${k.total_calls || 0}</td>
+          <td style="font-size:13px;color:var(--muted)">${SD.fmtTime(k.last_used)}</td>
+          <td style="white-space:nowrap">
+            ${k.is_active ? `
+              <button class="btn btn-ghost btn-sm" onclick="copyMasked('${esc(k.masked)}')">复制</button>
+              <button class="btn btn-ghost btn-sm" onclick="rotateKey(${k.id})">轮换</button>
+              <button class="btn btn-danger btn-sm" onclick="revokeKey(${k.id})">吊销</button>
+            ` : `
+              <button class="btn btn-danger btn-sm" onclick="purgeKey(${k.id})">删除</button>
+            `}
+          </td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
+}
+
+async function revokeKey(id) {
+  const k = state.keys.find((x) => x.id === id) || {};
+  const ok = await confirmBox('吊销密钥',
+    `确定吊销密钥 <b>${esc(k.name || id)}</b> 吗？<br><br>
+     使用它的程序将<b>立即</b>无法访问接口，请确认已更新相关配置。`,
+    '确认吊销');
+  if (!ok) return;
+  try {
+    await SD.api(`/apikey/${id}`, { method: 'DELETE' });
+    toast('密钥已吊销', 'ok');
+    loadKeys();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function purgeKey(id) {
+  const k = state.keys.find((x) => x.id === id) || {};
+  const ok = await confirmBox('永久删除密钥',
+    `确定永久删除 <b>${esc(k.name || id)}</b> 吗？<br><br>
+     记录将被抹掉且<b>无法恢复</b>，历史调用日志会保留用于审计。<br>
+     （该密钥已吊销，不会影响任何线上程序）`,
+    '确认删除');
+  if (!ok) return;
+  try {
+    await SD.api(`/apikey/${id}/purge`, { method: 'DELETE' });
+    toast('密钥已永久删除', 'ok');
+    loadKeys();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function rotateKey(id) {
+  const ok = await confirmBox('轮换密钥',
+    '轮换会生成<b>新密钥</b>并立即使旧密钥失效，确定继续？<br><br>请提前准备好更新线上配置。',
+    '确认轮换');
+  if (!ok) return;
+  try {
+    const r = await SD.api(`/apikey/${id}/rotate`, { method: 'POST' });
+    showSecret(r.data.secret);
+    toast('已轮换，请保存新密钥', 'ok');
+    loadKeys();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function copyMasked(m) {
+  SD.copy(m);
+  toast('已复制（脱敏前缀）', 'ok');
+}
+
+function showSecret(secret) {
+  go('keys');
+  document.getElementById('secretText').textContent = secret;
+  document.getElementById('secretPanel').style.display = '';
+  document.getElementById('secretPanel').scrollIntoView({ behavior: 'smooth' });
+}
+document.getElementById('copySecret').onclick = () => {
+  SD.copy(document.getElementById('secretText').textContent);
+  toast('密钥已复制到剪贴板', 'ok');
+};
+
+document.getElementById('createBtn').onclick = () => {
+  document.getElementById('createPanel').style.display = '';
+  document.getElementById('createPanel').scrollIntoView({ behavior: 'smooth' });
+};
+document.getElementById('cancelCreate').onclick = () => {
+  document.getElementById('createPanel').style.display = 'none';
+};
+document.getElementById('submitCreate').onclick = async () => {
+  const scopes = [...document.querySelectorAll('.kScope:checked')].map((c) => c.value);
+  const expire = document.getElementById('kExpire').value;
+  const limit = document.getElementById('kLimit').value;
+  const body = {
+    name: document.getElementById('kName').value || 'default',
+    scopes: scopes.length ? scopes : ['quote'],
+    expires_in_days: expire ? parseInt(expire) : null,
+  };
+  if (limit) body.rate_limit = parseInt(limit);   // 留空则用套餐默认
+  try {
+    const r = await SD.api('/apikey', { method: 'POST', body: JSON.stringify(body) });
+    document.getElementById('createPanel').style.display = 'none';
+    showSecret(r.data.secret);
+    loadKeys();
+  } catch (e) { toast(e.message, 'err'); }
+};
+
+/* ============================================================
+   套餐与充值
+   ============================================================ */
+function setPeriod(p) {
+  state.period = p;
+  document.getElementById('segMonth').classList.toggle('on', p === 'month');
+  document.getElementById('segYear').classList.toggle('on', p === 'year');
+  renderPlans();
+}
+
+async function loadPlanView() {
+  // 套餐卡片要显示"当前套餐"和余额，必须先有 /billing/me 的数据
+  await loadMe();
+  try {
+    const r = await SD.api('/billing/plans');
+    const d = r.data || {};
+    state.plans = d.items || [];
+    state.presets = d.presets || [];
+    renderPlans();
+    renderPresets();
+    loadOrders();
+    loadChannels();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function renderPlans() {
+  const grid = document.getElementById('planGrid');
+  const plans = state.plans || [];
+  const bal = (state.me || {}).balance || 0;
+  if (!plans.length) {
+    grid.innerHTML = '<div class="empty">暂无可购买套餐</div>';
+    return;
+  }
+  const cur = (state.me || {}).plan || {};
+  document.getElementById('planNote').textContent =
+    `当前：${cur.name || '-'} · 余额 ¥${(state.me || {}).balance_yuan || '0.00'}`;
+
+  grid.innerHTML = plans.map((p) => {
+    const price = state.period === 'year' ? p.price_year : p.price_month;
+    const priceYuan = (price / 100).toFixed(2);
+    const monthYuan = (p.price_month / 100).toFixed(2);
+    const isCur = p.is_current;
+    const canBuy = !isCur && price > 0;
+    const enough = bal >= price;
+    const saveNote = state.period === 'year' && p.price_year > 0
+      ? `<span class="year-note">≈ ¥${(p.price_year / 1200).toFixed(2)}/月</span>` : '';
+
+    let btn;
+    if (isCur) {
+      btn = `<button class="btn btn-ghost" disabled>当前套餐</button>`;
+    } else if (price <= 0) {
+      btn = `<button class="btn btn-primary" onclick="buyPlan('${esc(p.code)}')">切换到此套餐</button>`;
+    } else if (!enough) {
+      btn = `<button class="btn btn-primary" onclick="needRecharge(${price - bal})">
+               还需 ¥${((price - bal) / 100).toFixed(2)} · 去充值</button>`;
+    } else {
+      btn = `<button class="btn btn-primary" onclick="buyPlan('${esc(p.code)}')">
+               ${p.can_upgrade ? '立即升级' : '切换套餐'}</button>`;
+    }
+
+    return `
+      <div class="plan-card ${isCur ? 'current' : ''}">
+        ${isCur ? '<span class="plan-flag cur">使用中</span>'
+                : (p.can_upgrade ? '<span class="plan-flag">可升级</span>' : '')}
+        <div class="pname">${esc(p.name)}</div>
+        <div class="pdesc">${esc(p.description || '')}</div>
+        <div class="plan-price">
+          <span class="cur">¥</span><span class="val">${priceYuan}</span>
+          <span class="per">/ ${state.period === 'year' ? '年' : '月'}</span>${saveNote}
+        </div>
+        ${state.period === 'year' && p.price_year > 0
+          ? `<div style="font-size:12.5px;color:var(--muted)">月付 ¥${monthYuan} × 12 = ¥${(p.price_month * 12 / 100).toFixed(2)}，年付立省 ¥${((p.price_month * 12 - p.price_year) / 100).toFixed(2)}</div>`
+          : '<div style="font-size:12.5px;color:var(--muted)">&nbsp;</div>'}
+        <ul class="plan-feats">
+          ${(p.features || []).map((f) => `<li>${esc(f)}</li>`).join('')}
+        </ul>
+        ${btn}
+      </div>`;
+  }).join('');
+}
+
+function renderPresets() {
+  const grid = document.getElementById('rcGrid');
+  const presets = state.presets || [];
+  grid.innerHTML = presets.map((p) => `
+    <div class="rc-opt" data-amt="${p.amount}" onclick="pickAmount(${p.amount})">
+      <div class="amt">¥${p.yuan}</div>
+      <div class="tip">${p.amount >= 100000 ? '推荐大额' : ''}</div>
+    </div>`).join('');
+  updateRcHint();
+}
+
+function pickAmount(cents) {
+  state.rechargeCents = cents;
+  document.getElementById('rcCustom').value = '';
+  document.querySelectorAll('.rc-opt').forEach((el) => {
+    el.classList.toggle('sel', Number(el.dataset.amt) === cents);
+  });
+  updateRcHint();
+}
+
+document.getElementById('rcCustom').oninput = () => {
+  const v = parseFloat(document.getElementById('rcCustom').value);
+  state.rechargeCents = isNaN(v) ? 0 : Math.round(v * 100);
+  document.querySelectorAll('.rc-opt').forEach((el) => el.classList.remove('sel'));
+  updateRcHint();
+};
+
+function updateRcHint() {
+  const c = state.rechargeCents || 0;
+  document.getElementById('rcHint').textContent =
+    c > 0 ? `本次充值 ¥${(c / 100).toFixed(2)}` : '请选择或输入金额';
+}
+
+/* ------------------------------------------------------------
+   支付方式：只渲染后端说"可用"的渠道。
+
+   在线支付（微信/支付宝）只有在商户参数配齐时才会出现在列表里，
+   没配就只给线下转账 —— 不给一个点了必然报错的按钮。
+   ------------------------------------------------------------ */
+async function loadChannels() {
+  const sel = document.getElementById('rcChannel');
+  const keep = sel.value;
+  try {
+    const r = await SD.api('/billing/channels');
+    const items = (r.data && r.data.items) || [];
+    sel.innerHTML = items.map((c) =>
+      `<option value="${esc(c.channel)}">${esc(c.label)}${c.note ? '（' + esc(c.note) + '）' : ''}</option>`
+    ).join('');
+    if (items.some((c) => c.channel === keep)) sel.value = keep;
+    document.getElementById('onlineTip').style.display =
+      (r.data && r.data.online_ready) ? 'none' : 'block';
+  } catch (e) {
+    // 拿不到就退回线下转账，保证任何时候都能下单
+    sel.innerHTML = '<option value="manual">线下转账（后台确认到账）</option>';
+  }
+}
+
+document.getElementById('rcSubmit').onclick = async () => {
+  const cents = state.rechargeCents || 0;
+  if (cents < 100) { toast('请先选择或输入充值金额', 'err'); return; }
+  const channel = document.getElementById('rcChannel').value;
+  const btn = document.getElementById('rcSubmit');
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    const r = await SD.api('/billing/recharge', {
+      method: 'POST',
+      body: JSON.stringify({ amount: cents, channel }),
+    });
+    const o = r.data || {};
+    if (o.qr_svg) {
+      // 在线支付：弹收银台扫码，轮询等待入账
+      showPayDialog(o);
+    } else if (channel === 'mock') {
+      const ok = await confirmBox('确认支付',
+        `订单 <b>${esc(o.order_no)}</b><br>金额 <b>¥${esc(o.amount_yuan)}</b><br><br>
+         这是<b>模拟支付</b>，确认后立即到账。`,
+        '确认支付 ¥' + o.amount_yuan);
+      if (!ok) { toast('已取消支付', 'ok'); return; }
+      const paid = await SD.api(`/billing/orders/${o.order_no}/pay`, { method: 'POST', body: '{}' });
+      toast(`充值成功，当前余额 ¥${paid.data.balance_yuan}`, 'ok');
+      await loadMe();
+      loadPlanView();
+    } else {
+      toast('订单已创建，请完成转账后等待后台确认', 'ok');
+      loadPlanView();
+    }
+  } catch (e) {
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '立即充值';
+  }
+};
+
+/* ------------------------------------------------------------
+   收银台：二维码 + 轮询订单状态
+
+   为什么轮询而不是干等：渠道回调是异步的，前端无从得知何时到账。
+   轮询 /billing/orders 拿状态最省事，支付成功自动关闭弹窗。
+   ------------------------------------------------------------ */
+let payTimer = null;
+
+function showPayDialog(o) {
+  const box = document.getElementById('payModal');
+  document.getElementById('payQr').innerHTML =
+    `<img src="${o.qr_svg}" alt="支付二维码" style="width:230px;height:230px">`;
+  document.getElementById('payInfo').innerHTML =
+    `<div>订单号 <b>${esc(o.order_no)}</b></div>
+     <div style="margin-top:6px">金额 <b style="font-size:20px">¥${esc(o.amount_yuan)}</b></div>`;
+  box.style.display = 'flex';
+
+  let ticks = 0;
+  clearInterval(payTimer);
+  payTimer = setInterval(async () => {
+    ticks += 1;
+    // 最多轮询 10 分钟（二维码有效期 30 分钟，留足余量）
+    if (ticks > 100) {
+      clearInterval(payTimer);
+      document.getElementById('payTip').textContent = '二维码可能已过期，请重新下单';
+      return;
+    }
+    try {
+      const r = await SD.api(`/billing/orders?kind=recharge&status=all&limit=20`);
+      const hit = ((r.data || {}).items || []).find((x) => x.order_no === o.order_no);
+      if (hit && hit.status === 'paid') {
+        clearInterval(payTimer);
+        closePayDialog();
+        toast(`支付成功，已到账 ¥${o.amount_yuan}`, 'ok');
+        await loadMe();
+        loadPlanView();
+      }
+    } catch (e) { /* 轮询失败不用打扰用户，下一轮再试 */ }
+  }, 6000);
+}
+
+function closePayDialog() {
+  clearInterval(payTimer);
+  document.getElementById('payModal').style.display = 'none';
+}
+
+async function buyPlan(code) {
+  const p = (state.plans || []).find((x) => x.code === code);
+  if (!p) return;
+  const price = state.period === 'year' ? p.price_year : p.price_month;
+  const bal = (state.me || {}).balance || 0;
+  const perLabel = state.period === 'year' ? '年付' : '月付';
+
+  if (price > bal) { needRecharge(price - bal); return; }
+
+  const ok = await confirmBox('确认购买', `
+    <div style="line-height:2">
+      <div>套餐：<b>${esc(p.name)}</b>（${perLabel}）</div>
+      <div>应付：<b style="font-size:18px">¥${(price / 100).toFixed(2)}</b></div>
+      <div>当前余额：¥${(bal / 100).toFixed(2)}</div>
+      <div>支付后余额：<b>¥${((bal - price) / 100).toFixed(2)}</b></div>
+    </div>`, '确认支付');
+  if (!ok) return;
+
+  try {
+    const r = await SD.api('/billing/buy', {
+      method: 'POST',
+      body: JSON.stringify({ plan_code: code, period: state.period }),
+    });
+    toast(r.msg || '购买成功', 'ok');
+    await loadMe();
+    loadPlanView();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function needRecharge(gapCents) {
+  state.rechargeCents = Math.max(gapCents, 10000);
+  document.getElementById('rcCustom').value = (state.rechargeCents / 100).toFixed(0);
+  document.querySelectorAll('.rc-opt').forEach((el) => {
+    el.classList.toggle('sel', Number(el.dataset.amt) === state.rechargeCents);
+  });
+  updateRcHint();
+  toast(`余额不足，已为你填入 ¥${(state.rechargeCents / 100).toFixed(2)}，确认后即可完成支付`, 'err');
+  document.getElementById('rcSubmit').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* ---------- 待支付订单 ---------- */
+async function loadOrders() {
+  const wrap = document.getElementById('pendingWrap');
+  try {
+    const r = await SD.api('/billing/orders?status=pending&limit=20');
+    const items = (r.data || {}).items || [];
+    if (!items.length) {
+      wrap.innerHTML = '<div class="empty">没有待支付的订单</div>';
+      return;
+    }
+    wrap.innerHTML = `<table>
+      <thead><tr><th>订单号</th><th>金额</th><th>方式</th><th>下单时间</th><th>操作</th></tr></thead>
+      <tbody>${items.map((o) => `
+        <tr>
+          <td class="mono" style="font-size:12.5px">${esc(o.order_no)}</td>
+          <td><b>¥${esc(o.amount_yuan)}</b></td>
+          <td>${o.pay_channel === 'mock' ? '模拟支付' : '线下转账'}</td>
+          <td style="font-size:13px;color:var(--muted)">${SD.fmtTime(o.created_at)}</td>
+          <td style="white-space:nowrap">
+            ${o.pay_channel === 'mock'
+              ? `<button class="btn btn-primary btn-sm" onclick="payOrder('${esc(o.order_no)}')">立即支付</button>`
+              : '<span class="chip">等待后台确认</span>'}
+            <button class="btn btn-ghost btn-sm" onclick="cancelOrder('${esc(o.order_no)}')">取消</button>
+          </td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
+}
+
+async function payOrder(no) {
+  try {
+    const r = await SD.api(`/billing/orders/${no}/pay`, { method: 'POST', body: '{}' });
+    toast(`支付成功，余额 ¥${r.data.balance_yuan}`, 'ok');
+    await loadMe();
+    loadOrders();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function cancelOrder(no) {
+  const ok = await confirmBox('取消订单', `确定取消订单 <b>${esc(no)}</b> 吗？`, '取消订单');
+  if (!ok) return;
+  try {
+    await SD.api(`/billing/orders/${no}/cancel`, { method: 'POST' });
+    toast('订单已取消', 'ok');
+    loadOrders();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+/* ============================================================
+   账单与订单
+   ============================================================ */
+async function loadBillsView() {
+  await loadMe();
+  if (state.me) {
+    document.getElementById('billBalance').textContent = '¥' + (state.me.balance_yuan || '0.00');
+  }
+  loadBills();
+  loadOrderList();
+}
+
+async function loadBills() {
+  const st = state.bills;
+  const type = document.getElementById('billType').value;
+  try {
+    const r = await SD.api(`/billing/bills?type=${type}&offset=${st.offset}&limit=${st.limit}`);
+    const d = r.data || {};
+    st.total = d.total || 0;
+    document.getElementById('billIncome').textContent = '¥' + (d.income_yuan || '0.00');
+    document.getElementById('billOutcome').textContent = '¥' + (d.outcome_yuan || '0.00');
+    document.getElementById('billCount').textContent = `共 ${st.total} 条`;
+
+    const wrap = document.getElementById('billWrap');
+    const items = d.items || [];
+    if (!items.length) {
+      wrap.innerHTML = '<div class="empty">暂无流水记录</div>';
+    } else {
+      wrap.innerHTML = `<table>
+        <thead><tr><th>时间</th><th>类型</th><th>说明</th><th>金额</th><th>余额</th></tr></thead>
+        <tbody>${items.map((b) => `
+          <tr>
+            <td style="font-size:13px">${SD.fmtTime(b.created_at)}</td>
+            <td><span class="chip">${esc(b.type_label || b.type)}</span></td>
+            <td>${esc(b.remark || '')}</td>
+            <td class="${b.amount >= 0 ? 'money-in' : 'money-out'}">
+              ${b.amount >= 0 ? '+' : '-'}¥${esc(b.amount_yuan)}</td>
+            <td class="mono">¥${esc(b.balance_after_yuan)}</td>
+          </tr>`).join('')}
+        </tbody></table>`;
+    }
+    renderPager('billPager', st);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function loadOrderList() {
+  const st = state.orders;
+  const status = document.getElementById('orderStatus').value;
+  try {
+    const r = await SD.api(`/billing/orders?status=${status}&offset=${st.offset}&limit=${st.limit}`);
+    const d = r.data || {};
+    st.total = d.total || 0;
+    document.getElementById('orderCount').textContent = `共 ${st.total} 笔`;
+
+    const wrap = document.getElementById('orderWrap');
+    const items = d.items || [];
+    if (!items.length) {
+      wrap.innerHTML = '<div class="empty">暂无订单</div>';
+    } else {
+      wrap.innerHTML = `<table>
+        <thead><tr><th>订单号</th><th>类型</th><th>内容</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
+        <tbody>${items.map((o) => `
+          <tr>
+            <td class="mono" style="font-size:12.5px">${esc(o.order_no)}</td>
+            <td>${esc(o.kind === 'recharge' ? '充值'
+                    : o.kind === 'renew' ? '续费'
+                    : o.kind === 'upgrade' ? '升级' : '变更')}</td>
+            <td>${esc(o.title || '')}</td>
+            <td><b>¥${esc(o.amount_yuan)}</b></td>
+            <td>${o.status === 'paid'
+              ? '<span class="status ok">已支付</span>'
+              : o.status === 'pending'
+                ? '<span class="status partial">待支付</span>'
+                : '<span class="status partial">' + esc(o.status) + '</span>'}</td>
+            <td style="font-size:13px;color:var(--muted)">${SD.fmtTime(o.created_at)}</td>
+          </tr>`).join('')}
+        </tbody></table>`;
+    }
+    renderPager('orderPager', st);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+/* 分页：账单与订单共用一套翻页逻辑，用 id 反查 state 与加载函数 */
+const PAGER_STATE = { billPager: 'bills', orderPager: 'orders' };
+const PAGER_LOADER = { billPager: loadBills, orderPager: loadOrderList };
+
+function renderPager(id, st) {
+  const el = document.getElementById(id);
+  const pages = Math.max(1, Math.ceil(st.total / st.limit));
+  const cur = Math.floor(st.offset / st.limit) + 1;
+  if (st.total <= st.limit) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="pager-info">第 ${cur} / ${pages} 页</div>
+    <div class="pager-btns">
+      <button class="btn btn-ghost btn-sm" ${cur <= 1 ? 'disabled' : ''}
+        onclick="gotoOffset('${id}', -1)">上一页</button>
+      <button class="btn btn-ghost btn-sm" ${cur >= pages ? 'disabled' : ''}
+        onclick="gotoOffset('${id}', 1)">下一页</button>
+    </div>`;
+}
+
+function gotoOffset(id, delta) {
+  const key = PAGER_STATE[id];
+  const st = state[key];
+  st.offset = Math.max(0, st.offset + delta * st.limit);
+  PAGER_LOADER[id]();
+}
+
+/* 切换筛选条件时必须回到第一页，否则会出现"第 3 页但只有 2 条" */
+function resetPage(key, fn) {
+  state[key].offset = 0;
+  fn();
+}
+
+/* ============================================================
+   用量统计
+   ============================================================ */
+async function loadUsage() {
+  const days = document.getElementById('usDays').value;
+  try {
+    const r = await SD.api(`/billing/usage?days=${days}`);
+    const d = r.data || {};
+    state.usage = d;
+    document.getElementById('us24').textContent = nfmt(d.calls_24h);
+    document.getElementById('us7').textContent = nfmt(d.calls_7d);
+    document.getElementById('usAll').textContent = nfmt(d.calls_total);
+    document.getElementById('usErr').textContent = (d.error_rate || 0).toFixed(2) + '%';
+    /* error_rate / errors_24h 都是"今日"口径，副标题就不要再写"近 N 天"了 */
+    document.getElementById('usErrSub').textContent = d.error_rate
+      ? `今日 ${nfmt(d.errors_24h || 0)} 次失败`
+      : '今日无失败请求';
+
+    const q = d.quota || {};
+    document.getElementById('us24sub').textContent = q.unlimited
+      ? '不限量' : `配额 ${nfmt(q.daily_quota)} · 已用 ${(q.pct || 0)}%`;
+
+    renderUsageChart(d.daily || []);
+    renderTopPaths(d.top_paths || []);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+/* 优雅刻度：把 max 向上取整成 1/2/2.5/5/10 × 10^n，避免出现 46 这种零头刻度 */
+function niceCeil(v) {
+  if (v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const f = v / p;
+  const step = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+  return step * p;
+}
+
+/* 把 Y 轴刻度标签按"份数"拆成整倍数，生成 [0, step, 2step, ...] */
+function axisTicks(top, divs) {
+  const out = [];
+  for (let i = 0; i <= divs; i++) out.push((top / divs) * i);
+  return out;
+}
+
+/* 日期标签密度：最多放 ~9 个，太多就隔几个显示一个 */
+function dateStep(n, maxLabels) {
+  return Math.max(1, Math.ceil(n / maxLabels));
+}
+
+function renderUsageChart(daily) {
+  const box = document.getElementById('usChart');
+  if (!daily.length) { box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+
+  /* ---- 坐标系 ----
+     坑：之前用 viewBox="0 0 100 220" + width:100%，等于把 100 宽的坐标系
+     横向拉伸 10 倍，SVG 里所有 <text> 跟着被拉扁 → 数字糊成一团。
+     现在按近似真实像素布局（960×300），viewBox 只是等比缩放，
+     文字与柱子的比例就正常了。 */
+  const W = 960, H = 300;
+  const padL = 56, padR = 16, padT = 18, padB = 40;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const baseY = H - padB;
+
+  const totalMax = Math.max(0, ...daily.map((d) => d.total));
+  const top = niceCeil(totalMax);
+  const ticks = axisTicks(top, 4);
+  const n = daily.length;
+  const bw = plotW / n;
+  const barW = Math.max(4, Math.min(bw * 0.62, 46));
+  const ds = dateStep(n, 9);
+
+  /* 网格 + Y 轴刻度（千分位，带单位提示） */
+  const grid = ticks.map((t) => {
+    const y = baseY - (t / top) * plotH;
+    return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}"
+              stroke="rgba(255,255,255,.07)" stroke-width="1"/>
+            <text x="${padL - 10}" y="${y + 4}" font-size="12" fill="#6b7a99"
+              text-anchor="end" font-family="Consolas,ui-monospace,monospace">${nfmt(t)}</text>`;
+  }).join('');
+
+  /* 柱子：成功蓝 + 失败红叠顶；顶部标数值（柱子太矮就不标，避免堆叠） */
+  const bars = daily.map((d, i) => {
+    const x = padL + i * bw + (bw - barW) / 2;
+    const hOk = (d.total - d.errors) / top * plotH;
+    const hErr = d.errors / top * plotH;
+    const yOk = baseY - hOk;
+    const yErr = yOk - hErr;
+    const isLast = i === n - 1;
+    const showVal = d.total > 0 && hOk + hErr > 22;
+    const valY = (d.errors ? yErr : yOk) - 6;
+    return `
+      <g class="us-bar">
+        <title>${d.date} · 共 ${nfmt(d.total)} 次${d.errors ? `，失败 ${nfmt(d.errors)} 次` : '，无失败'}</title>
+        <rect x="${x}" y="${baseY - 2}" width="${barW}" height="${plotH}" fill="transparent"/>
+        <rect x="${x}" y="${yOk}" width="${barW}" height="${Math.max(hOk, d.total ? 2 : 0)}"
+              fill="${isLast ? 'url(#gBarHot)' : 'url(#gBar)'}" rx="3"/>
+        ${d.errors ? `<rect x="${x}" y="${yErr}" width="${barW}" height="${Math.max(hErr, 2)}"
+              fill="#f0453a" rx="3"/>` : ''}
+        ${showVal ? `<text x="${x + barW / 2}" y="${valY}" font-size="12" font-weight="600"
+              fill="${isLast ? '#8fb6ff' : '#a3b0c8'}" text-anchor="middle"
+              font-family="Consolas,ui-monospace,monospace">${nfmt(d.total)}</text>` : ''}
+        ${(i % ds === 0 || isLast) ? `<text x="${x + barW / 2}" y="${baseY + 20}" font-size="11.5"
+              fill="${isLast ? '#8fb6ff' : '#6b7a99'}" text-anchor="middle"
+              font-family="Consolas,ui-monospace,monospace">${d.date.slice(5)}</text>` : ''}
+      </g>`;
+  }).join('');
+
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="trend-svg" preserveAspectRatio="xMidYMid meet"
+      role="img" aria-label="近 ${n} 天接口调用趋势">
+    <defs>
+      <linearGradient id="gBar" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4d8bff"/><stop offset="100%" stop-color="#2b5fd9"/>
+      </linearGradient>
+      <linearGradient id="gBarHot" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#3d7dff"/>
+      </linearGradient>
+    </defs>
+    ${grid}
+    <line x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}"
+          stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+    ${bars}
+  </svg>
+  <div class="chart-legend">
+    <span><i class="lg lg-ok"></i>成功调用</span>
+    <span><i class="lg lg-err"></i>失败调用</span>
+    <span class="legend-tail">峰值 ${nfmt(totalMax)} 次/天 · 纵轴上限 ${nfmt(top)}</span>
+  </div>`;
+}
+
+function renderTopPaths(paths) {
+  const box = document.getElementById('usTop');
+  if (!paths.length) { box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  const max = Math.max(1, ...paths.map((p) => p.count));
+  const sum = paths.reduce((a, p) => a + p.count, 0) || 1;
+  box.innerHTML = paths.map((p) => {
+    const pct = (p.count / sum * 100);
+    return `
+    <div class="bar-row">
+      <div class="bar-name mono" title="${esc(p.path)}">${esc(p.path.replace('/api/v1', ''))}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${p.count / max * 100}%"></div></div>
+      <div class="bar-pct">${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%</div>
+      <div class="bar-val">${nfmt(p.count)}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============================================================
+   启动
+   ============================================================ */
+/* 先拉一次顶栏（邮箱 / 套餐 / 余额 / 到期），它横跨所有视图。
+   loadMe() 只写顶栏和概览卡片，不会重复触发 view 的加载。 */
+(async function boot() {
+  try {
+    await loadMe();
+  } catch (e) {
+    // 顶栏拉不到通常是登录态问题，SD.api 已处理跳转；
+    // 这里只做兜底提示，不要阻断后面 go('overview')
+    if (!/登录已失效/.test(e.message || '')) {
+      document.getElementById('userInfo').textContent = '资料加载失败：' + e.message;
+    }
+  }
+  try {
+    go('overview');
+  } catch (e) {
+    markViewFailed('overview', e);
+  }
+})();
+</script>
+</body>
+</html>

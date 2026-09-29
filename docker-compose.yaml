@@ -1,0 +1,101 @@
+# StockData 多源金融数据平台
+#
+# 敏感配置全部走环境变量（${VAR}），从同目录的 .env 读取。
+# 部署前请先：cp .env.example .env 并填真实值。
+# 仓库里不含任何真实密钥 —— 如果你的 .env 里还是 example 的占位值，
+# 容器起来后 API 调用会失败，请先检查这一项。
+#
+# 绿联 Container Manager 部署注意（踩过的坑）：
+#   1. 文件名必须是 .yaml，不能是 .yml —— 绿联 UI 只认 .yaml
+#   2. 不要使用 env_file: —— 绿联 yml 校验器兼容性差，全部内联到 environment:
+#   3. condition: service_healthy 要改成 service_started（v1 兼容）
+#   4. bind mount 数据目录需先在宿主机 chown -R 999:999 && chmod 777
+#   5. 绿联 UI 不会替你去读 .env，所以这里的 ${VAR:-占位} 都带了默认值兜底。
+#      用 CLI（docker compose）时 .env 会被自动加载覆盖默认值；
+#      在 UI 里创建项目时，请务必把 environment 里的值手改成真实值。
+#
+# 端口约定（全站统一 9850）：
+#   宿主 9850 -> nginx 容器 80 -> api 容器 9850（uvicorn）
+#   改端口要同时动三处：docker-compose.yaml 的 ports、nginx/nginx.conf 的
+#   upstream、backend/Dockerfile 的 EXPOSE + CMD --port
+#
+# 部署路径建议：/volume1/docker/stockdata/
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stockdata-postgres
+    environment:
+      POSTGRES_DB: stockdata
+      POSTGRES_USER: stockdata
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: stockdata-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - ./data/redis:/data
+    restart: unless-stopped
+
+  # FastAPI 后端 —— 同时托管前端静态页面（网站 + API 一体）
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stockdata-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://stockdata:${POSTGRES_PASSWORD:-change_me}@postgres:5432/stockdata
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change_me}
+      HITHINK_API_KEY: ${HITHINK_API_KEY:-}
+      HITHINK_BASE: ${HITHINK_BASE:-https://fuyao.aicubes.cn}
+      EASYTDX_BASE: ${EASYTDX_BASE:-http://NAS_INTERNAL_IP:8000}
+      KPL_PROXY_BASE: ${KPL_PROXY_BASE:-http://NAS_INTERNAL_IP:8018}
+      TZ: Asia/Shanghai
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # 采集器 —— 独立容器，生命周期与 API 解耦
+  collector:
+    build:
+      context: .
+      dockerfile: collector/Dockerfile
+    container_name: stockdata-collector
+    environment:
+      DATABASE_URL: postgresql+psycopg://stockdata:${POSTGRES_PASSWORD:-change_me}@postgres:5432/stockdata
+      REDIS_URL: redis://redis:6379/0
+      HITHINK_API_KEY: ${HITHINK_API_KEY:-}
+      HITHINK_BASE: ${HITHINK_BASE:-https://fuyao.aicubes.cn}
+      EASYTDX_BASE: ${EASYTDX_BASE:-http://NAS_INTERNAL_IP:8000}
+      KPL_PROXY_BASE: ${KPL_PROXY_BASE:-http://NAS_INTERNAL_IP:8018}
+      TZ: Asia/Shanghai
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: stockdata-nginx
+    ports:
+      - "9850:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    #: nginx 会**缓存 upstream 的 DNS 解析结果**。api 容器被 recreate 后
+    #: （改代码重新部署时必然发生）IP 会变，而 nginx 仍指向旧 IP →
+    #: 全部请求 502 Bad Gateway，但容器状态显示一切正常，极具迷惑性。
+    #: 实测踩到过：后端日志完全正常、容器全 Up，就是访问 502。
+    #: 解决：api 重建时让 nginx 跟着重启，重新解析一次 DNS。
+    labels:
+      - "stockdata.restart-with=api"

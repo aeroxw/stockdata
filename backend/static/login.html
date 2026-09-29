@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 / 注册 — StockData</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 100px 20px 60px; position: relative; }
+  .auth-wrap::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(800px 400px at 50% 0%, rgba(61,125,255,.16), transparent 65%);
+  }
+  .auth-card {
+    position: relative; width: min(430px, 92vw);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 38px; box-shadow: var(--shadow-lg);
+  }
+  .tabs { display: flex; gap: 4px; background: var(--bg-soft); padding: 4px; border-radius: 10px; margin-bottom: 28px; }
+  .tab {
+    flex: 1; padding: 9px; border-radius: 7px; font-size: 14.5px; font-weight: 600;
+    color: var(--muted); text-align: center; transition: all .2s;
+  }
+  .tab.active { background: var(--primary); color: #fff; }
+  .auth-card .field { margin-bottom: 18px; }
+  .auth-card .field input { width: 100%; }
+  .auth-card .btn { width: 100%; margin-top: 8px; }
+  .auth-hint { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .auth-foot { text-align: center; margin-top: 22px; font-size: 13.5px; color: var(--muted); }
+  .auth-foot a { color: var(--primary); }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="/">
+      <div class="logo-mark">S</div>
+      <div>StockData <span>金融数据平台</span></div>
+    </a>
+    <div class="nav-links" style="margin-left:auto">
+      <a href="/">返回首页</a>
+    </div>
+  </div>
+</nav>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="tabs">
+      <button class="tab active" data-tab="login">登录</button>
+      <button class="tab" data-tab="register">注册</button>
+    </div>
+
+    <div id="msgBox"></div>
+
+    <!-- 登录 -->
+    <form id="loginForm">
+      <div class="field">
+        <label>邮箱</label>
+        <input type="email" name="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input type="password" name="password" placeholder="请输入密码" required>
+      </div>
+      <button class="btn btn-primary" type="submit">登录</button>
+      <div class="auth-foot">还没有账号？<a href="#" data-switch="register">立即注册</a></div>
+    </form>
+
+    <!-- 注册 -->
+    <form id="regForm" style="display:none">
+      <div class="field">
+        <label>邮箱</label>
+        <input type="email" name="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input type="password" name="password" placeholder="至少 8 位" required minlength="8">
+        <div class="auth-hint">密码长度不少于 8 位</div>
+      </div>
+      <button class="btn btn-primary" type="submit">创建账号</button>
+      <div class="auth-foot">已有账号？<a href="#" data-switch="login">去登录</a></div>
+    </form>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+  const msgBox = document.getElementById('msgBox');
+  const loginForm = document.getElementById('loginForm');
+  const regForm = document.getElementById('regForm');
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.tab === tab));
+    loginForm.style.display = tab === 'login' ? '' : 'none';
+    regForm.style.display = tab === 'register' ? '' : 'none';
+  }
+
+  document.querySelectorAll('.tab').forEach(t =>
+    t.onclick = () => switchTab(t.dataset.tab));
+  document.querySelectorAll('[data-switch]').forEach(a => {
+    a.onclick = (e) => { e.preventDefault(); switchTab(a.dataset.switch); };
+  });
+
+  // 支持 ?tab=register 直达
+  if (SD.getQuery('tab') === 'register') switchTab('register');
+
+  // 已登录直接进控制台
+  if (SD.token) location.href = '/console.html';
+
+  loginForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(loginForm);
+    try {
+      const r = await SD.api('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+      });
+      SD.saveSession(r.data);
+      location.href = '/console.html';
+    } catch (err) {
+      SD.alert(msgBox, err.message, 'err');
+    }
+  };
+
+  regForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(regForm);
+    try {
+      await SD.api('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+      });
+      SD.alert(msgBox, '注册成功，正在自动登录…', 'ok');
+      const r = await SD.api('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+      });
+      SD.saveSession(r.data);
+      setTimeout(() => location.href = '/console.html', 600);
+    } catch (err) {
+      SD.alert(msgBox, err.message, 'err');
+    }
+  };
+</script>
+</body>
+</html>
