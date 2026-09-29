@@ -1,16 +1,21 @@
 """验证管理后台接口：stats / users / keys / logs 的筛选分页与各类写操作。"""
 
 import json
+import pathlib
 import random
 import sys
 import time
 import urllib.error
 import urllib.request
 
-BASE = "http://127.0.0.1:9850"
+# 管理员账号走本机 .env，不写进源码 —— 见 tools/local_cfg.py 的说明
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
+from local_cfg import cfg
+
+BASE = cfg("STOCKDATA_BASE", "http://127.0.0.1:9850").rstrip("/")
 API = "/api/v1"
-ADMIN_MAIL = "admin@example.com"
-ADMIN_PWD = "***REMOVED***"
+ADMIN_MAIL = cfg("STOCKDATA_ADMIN_EMAIL")
+ADMIN_PWD = cfg("STOCKDATA_ADMIN_PASSWORD")
 TS = f"{int(time.time())}{random.randint(1000, 9999)}"  # 加随机后缀，同秒重跑不撞车
 
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))

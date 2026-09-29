@@ -1,8 +1,8 @@
 # StockData 部署到绿联 NAS
 
 > **状态：已上线** ✅
-> 地址 `http://NAS_INTERNAL_IP:9850/`，5 个容器全部 Up。
-> 管理员 `admin@example.com`。
+> 地址 `http://<NAS内网IP>:9850/`，5 个容器全部 Up。
+> 管理员 `<你的管理员邮箱>`。
 >
 > **开源版说明**：本项目已移除全部支付与售卖功能（`paygate/`、订单、余额已删）。
 > 额度一律由管理员在后台「档位管理」指派，不存在"充钱换配额"的通路。
@@ -19,7 +19,7 @@ python -u tools/upload.py && python -u tools/deploy.py 2 && python -u tools/heal
 ### 1. 在 NAS 上准备目录
 
 ```bash
-ssh aeroxw@NAS_INTERNAL_IP
+ssh aeroxw@<NAS内网IP>
 sudo mkdir -p /volume1/docker/stockdata/{data/postgres,data/redis,init}
 cd /volume1/docker/stockdata
 
@@ -107,7 +107,7 @@ python -u tools/acceptance.py      # 端到端验收
 
 ### 7. 首访：注册管理员
 
-浏览器打开 `http://NAS_INTERNAL_IP:9850/`
+浏览器打开 `http://<NAS内网IP>:9850/`
 
 **第一个注册的账号自动成为管理员**（`is_first → is_admin=True`）。
 新用户一律落到免费版 `free`，额度不够就在后台给他换档。
@@ -118,7 +118,7 @@ python -u tools/acceptance.py      # 端到端验收
 
 | 项 | 预期 |
 |---|---|
-| `http://NAS_INTERNAL_IP:9850/` | 首页正常，底部是「开源与自建」，**没有定价区** |
+| `http://<NAS内网IP>:9850/` | 首页正常，底部是「开源与自建」，**没有定价区** |
 | 注册 + 登录 | 通过，进控制台 |
 | 控制台 | 四个视图：概览 / API 密钥 / 我的配额 / 用量统计 |
 | 控制台「我的配额」 | 显示三档额度，当前档位有标记，**无价格** |

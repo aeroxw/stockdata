@@ -1,17 +1,25 @@
-"""NAS 部署验收：从本机访问 NAS_INTERNAL_IP:9850 跑一遍关键链路。
+"""NAS 部署验收：从本机访问 STOCKDATA_BASE 跑一遍关键链路。
 
 验收项对齐 DEPLOY-NAS.md 的验收清单：
   首页 / 注册管理员 / 用量图表 / 建 Key / 调行情 / 充值只剩线下转账 /
   后台概览（缓存应已连接）
+
+目标地址与管理员账号走环境变量或项目根 .env（不再硬编码）：
+
+    STOCKDATA_BASE=http://192.168.x.x:9850
+    STOCKDATA_ADMIN_EMAIL=you@example.com
+    STOCKDATA_ADMIN_PASSWORD=你的密码
 """
 import json
 import time
 import urllib.error
 import urllib.request
 
-BASE = "http://NAS_INTERNAL_IP:9850"
+from local_cfg import admin_account, cfg
+
+BASE = cfg("STOCKDATA_BASE", "http://127.0.0.1:9850").rstrip("/")
 API = "/api/v1"
-ADMIN = ("admin@example.com", "***REMOVED***")
+ADMIN = admin_account()
 
 op = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 PASS = FAIL = 0
@@ -56,7 +64,7 @@ def ck(name, cond, extra=""):
 
 
 print("=" * 62)
-print("NAS 部署验收  http://NAS_INTERNAL_IP:9850")
+print("NAS 部署验收  http://<NAS内网IP>:9850")
 print("=" * 62)
 
 # 1. 静态页面

@@ -34,7 +34,7 @@ FAKE_USERS = [
         "created_at": "2026-09-29T03:59:26",
     },
     {
-        "id": 1, "email": "admin@example.com",
+        "id": 1, "email": "you@example.com",
         "tier": "vip", "is_admin": True, "is_active": True,
         "active_keys": 0, "key_quota": 50, "calls_24h": 503,
         "created_at": "2026-09-29T02:17:33",
@@ -74,7 +74,7 @@ Object.defineProperty(SD, 'refreshToken', { get: () => '', set: () => {} });
 
 const FAKE = __FAKE__;
 SD.api = async function (path) {
-  if (path.startsWith('/auth/me'))      return { data: { id: 1, email: 'admin@example.com', is_admin: true } };
+  if (path.startsWith('/auth/me'))      return { data: { id: 1, email: 'you@example.com', is_admin: true } };
   if (path.startsWith('/admin/plans'))  return { data: FAKE.plans };
   if (path.startsWith('/admin/users'))  return { data: { total: FAKE.users.length, items: FAKE.users } };
   if (path.startsWith('/admin/stats'))  return { data: FAKE.stats };

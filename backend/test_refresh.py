@@ -12,10 +12,15 @@
 """
 
 import json
+import pathlib
 import sys
 import time
 import urllib.error
 import urllib.request
+
+# 管理员账号走本机 .env，不写进源码 —— 见 tools/local_cfg.py 的说明
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
+from local_cfg import cfg
 
 BASE = "http://127.0.0.1:9850"
 EMAIL = "refresh_probe@stockdata.dev"
@@ -109,7 +114,9 @@ def main():
     check(8, "签名被改的 refresh_token 被拒 401", s == 401, f"status={s}")
 
     # 清理
-    s, b = req("POST", "/api/v1/auth/login", {"email": "admin@example.com", "password": "***REMOVED***"})
+    s, b = req("POST", "/api/v1/auth/login",
+               {"email": cfg("STOCKDATA_ADMIN_EMAIL"),
+                "password": cfg("STOCKDATA_ADMIN_PASSWORD")})
     if s == 200:
         adm = b["data"]["access_token"]
         s2, users = req("GET", "/api/v1/admin/users?limit=200", token=adm)

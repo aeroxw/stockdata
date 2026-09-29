@@ -11,9 +11,17 @@ import sys
 
 import paramiko
 
-HOST = "NAS_INTERNAL_IP"
-USER = "aeroxw"
-PWD = "***REMOVED***"
+from local_cfg import require
+
+# NAS 地址与口令**不写死这里** —— 2026-09-29 之前是硬编码的，
+# 首次推公开仓库时连同 ssh 口令一起泄露了。现在走环境变量 / 项目根 .env。
+# 本机 .env 里配上这三行就能照常用：
+#     NAS_HOST=192.168.x.x
+#     NAS_USER=你的用户名
+#     NAS_SSH_PASSWORD=你的SSH口令
+HOST = require("NAS_HOST", "NAS 的内网 IP，例如 192.168.1.10")
+USER = require("NAS_USER", "NAS 的 SSH 登录用户名，例如 admin")
+PWD = require("NAS_SSH_PASSWORD", "NAS 的 SSH 登录口令")
 
 
 def conn():

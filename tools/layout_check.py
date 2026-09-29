@@ -36,12 +36,16 @@ import sys
 import urllib.error
 import urllib.request
 
+from local_cfg import cfg
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STATIC = ROOT / "backend" / "static"
 WORK = ROOT / ".tmp" / "layout"
 
-BASE = "http://NAS_INTERNAL_IP:9850/api/v1"
-EMAIL, PWD = "admin@example.com", "***REMOVED***"
+# 地址与账号走本机 .env（以前写死 NAS 内网 IP 和口令，
+# 2026-09-29 首次推公开仓库时一起泄露了）
+BASE = cfg("STOCKDATA_BASE", "http://127.0.0.1:9850").rstrip("/") + "/api/v1"
+EMAIL, PWD = cfg("STOCKDATA_ADMIN_EMAIL"), cfg("STOCKDATA_ADMIN_PASSWORD")
 
 for _p in (r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"):

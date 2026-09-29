@@ -1,6 +1,6 @@
 """开盘了适配器 —— 龙虎榜 / 情绪数据补充源。
 
-走 NAS 上已部署的 kpl-proxy：http://NAS_INTERNAL_IP:8018
+走 NAS 上已部署的 kpl-proxy：http://<NAS内网IP>:8018
 该代理已解决签名问题：自动注入 DeviceID / PhoneOSNew=2 / VerSion=5.23.0.1 / apiv=w44，
 并按 c 参数路由到 apphis(历史) / apphwhq(今日) / applhb(龙虎榜) 三个上游。
 

@@ -5,12 +5,17 @@
 """
 
 import json
+import pathlib
 import socket
 import sys
 import threading
 import time
 import urllib.error
 import urllib.request
+
+# 管理员账号走本机 .env，不写进源码 —— 见 tools/local_cfg.py 的说明
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
+from local_cfg import cfg
 
 BASE = "http://127.0.0.1:9850"
 API = "/api/v1"
@@ -156,7 +161,8 @@ for i in range(40):
     time.sleep(1)
 
 st, js = req(f"{API}/auth/login", "POST",
-             {"email": "admin@example.com", "password": "***REMOVED***"})
+             {"email": cfg("STOCKDATA_ADMIN_EMAIL"),
+              "password": cfg("STOCKDATA_ADMIN_PASSWORD")})
 if st != 200:
     print("登录失败", st, js)
     sys.exit(1)

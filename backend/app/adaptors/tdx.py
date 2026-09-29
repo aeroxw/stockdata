@@ -31,7 +31,7 @@ from app.config import settings
 #: 以前这里写的 HOUR / MIN30 / MIN15…，全是无效值 ——
 #: 任何分钟级 K 线请求都会被回 400，TDX 源静默失效、
 #: 只能靠聚合器降级到同花顺/东财，表面上"能用"但 TDX 从没真正工作过。
-#: 查法：curl http://NAS_INTERNAL_IP:8000/openapi.json 看 /api/v1/bars 的 category 描述。
+#: 查法：curl http://<NAS内网IP>:8000/openapi.json 看 /api/v1/bars 的 category 描述。
 _CATEGORY = {
     "day": "DAY",
     "week": "WEEK",

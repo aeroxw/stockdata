@@ -60,8 +60,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change_me}
       HITHINK_API_KEY: ${HITHINK_API_KEY:-}
       HITHINK_BASE: ${HITHINK_BASE:-https://fuyao.aicubes.cn}
-      EASYTDX_BASE: ${EASYTDX_BASE:-http://NAS_INTERNAL_IP:8000}
-      KPL_PROXY_BASE: ${KPL_PROXY_BASE:-http://NAS_INTERNAL_IP:8018}
+      EASYTDX_BASE: ${EASYTDX_BASE:-http://127.0.0.1:8000}
+      KPL_PROXY_BASE: ${KPL_PROXY_BASE:-http://127.0.0.1:8018}
       TZ: Asia/Shanghai
     depends_on:
       - postgres
@@ -79,8 +79,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       HITHINK_API_KEY: ${HITHINK_API_KEY:-}
       HITHINK_BASE: ${HITHINK_BASE:-https://fuyao.aicubes.cn}
-      EASYTDX_BASE: ${EASYTDX_BASE:-http://NAS_INTERNAL_IP:8000}
-      KPL_PROXY_BASE: ${KPL_PROXY_BASE:-http://NAS_INTERNAL_IP:8018}
+      EASYTDX_BASE: ${EASYTDX_BASE:-http://127.0.0.1:8000}
+      KPL_PROXY_BASE: ${KPL_PROXY_BASE:-http://127.0.0.1:8018}
       TZ: Asia/Shanghai
     depends_on:
       - postgres

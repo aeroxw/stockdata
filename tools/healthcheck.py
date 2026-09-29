@@ -1,7 +1,14 @@
 """StockData 全功能 + 六家数据源体检。
 
 用法：python -u tools/healthcheck.py
-默认打 NAS（NAS_INTERNAL_IP:9850），加 --local 打本机。
+默认打 NAS，加 --local 打本机 127.0.0.1:9850。
+
+NAS 地址和管理员账号**不再硬编码**（2026-09-29 之前写死在文件里，
+推公开仓库时泄露了管理员邮箱与口令）。现在从环境变量或项目根 .env 读：
+
+    STOCKDATA_BASE=http://192.168.x.x:9850
+    STOCKDATA_ADMIN_EMAIL=you@example.com
+    STOCKDATA_ADMIN_PASSWORD=你的密码
 
 设计要点：
   * 六家数据源**分工不同**，不能用同一个接口测：
@@ -19,9 +26,14 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = "http://127.0.0.1:9850/api/v1" if "--local" in sys.argv else "http://NAS_INTERNAL_IP:9850/api/v1"
-EMAIL = "admin@example.com"
-PWD = "***REMOVED***"
+from local_cfg import cfg
+
+if "--local" in sys.argv:
+    BASE = "http://127.0.0.1:9850/api/v1"
+else:
+    BASE = cfg("STOCKDATA_BASE", "http://127.0.0.1:9850").rstrip("/") + "/api/v1"
+EMAIL = cfg("STOCKDATA_ADMIN_EMAIL")
+PWD = cfg("STOCKDATA_ADMIN_PASSWORD")
 
 op = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 PASS = FAIL = 0
