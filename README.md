@@ -13,9 +13,9 @@ StockData 把 **通达信 / 同花顺 / 开盘了 / 东方财富 / 新浪 / 腾�
 这层管控不能省，否则一个注册账号就能把六家上游撸到集体封 IP。
 
 <p align="center">
-  <img src="docs/images/homepage.jpg" alt="StockData 首页" width="480">
+  <img src="docs/images/homepage.jpg" alt="StockData 首页整页截图" width="100%">
   <br>
-  <sub>首页预览：市场概览 · 六大数据源 · 接入方式 · 在线调试</sub>
+  <sub>首页整页预览：市场概览 · 六大数据源 · 数据链路 · 在线调试 · 一键部署</sub>
 </p>
 
 ---
