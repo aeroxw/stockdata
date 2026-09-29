@@ -12,6 +12,12 @@ StockData 把 **通达信 / 同花顺 / 开盘了 / 东方财富 / 新浪 / 腾�
 「档位（plan）」只是管理员用来分配额度（Key 数 / 限流 / 日配额）的运营手段 ——
 这层管控不能省，否则一个注册账号就能把六家上游撸到集体封 IP。
 
+<p align="center">
+  <img src="docs/images/homepage.jpg" alt="StockData 首页" width="480">
+  <br>
+  <sub>首页预览：市场概览 · 六大数据源 · 接入方式 · 在线调试</sub>
+</p>
+
 ---
 
 ## 目录
