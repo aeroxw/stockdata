@@ -28,29 +28,25 @@ EDGE_CANDIDATES = [
 # 照着航哥截图里的两行用户造数据，长度、字段都对齐真实接口返回
 FAKE_USERS = [
     {
-        "id": 2, "email": "testuser@example.com",
+        "id": 2, "email": "someone_long_address@example.com",
         "tier": "pro", "is_admin": False, "is_active": True,
-        "active_keys": 0, "key_quota": 10, "balance": 0, "calls_24h": 1,
+        "active_keys": 0, "key_quota": 10, "calls_24h": 1,
         "created_at": "2026-09-29T03:59:26",
-        "is_trial": True, "plan_expires_at": "2026-10-14T03:59:26",
-        "days_left": 14, "expired": False,
     },
     {
         "id": 1, "email": "admin@example.com",
         "tier": "vip", "is_admin": True, "is_active": True,
-        "active_keys": 0, "key_quota": 50, "balance": 0, "calls_24h": 503,
+        "active_keys": 0, "key_quota": 50, "calls_24h": 503,
         "created_at": "2026-09-29T02:17:33",
-        "is_trial": False, "plan_expires_at": None,
-        "days_left": None, "expired": False,
     },
 ]
 
 FAKE_PLANS = [
-    {"code": "free", "name": "免费版", "level": 0, "price_month": 0, "price_year": 0,
+    {"code": "free", "name": "默认档", "level": 0,
      "max_keys": 3, "rate_limit": 60, "daily_quota": 1000, "is_active": True, "users": 0},
-    {"code": "pro", "name": "专业版", "level": 10, "price_month": 9900, "price_year": 99000,
+    {"code": "pro", "name": "进阶档", "level": 10,
      "max_keys": 10, "rate_limit": 300, "daily_quota": 50000, "is_active": True, "users": 1},
-    {"code": "vip", "name": "旗舰版", "level": 20, "price_month": 29900, "price_year": 299000,
+    {"code": "vip", "name": "宽松档", "level": 20,
      "max_keys": 50, "rate_limit": 1200, "daily_quota": -1, "is_active": True, "users": 1},
 ]
 

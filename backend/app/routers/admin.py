@@ -2,12 +2,14 @@
 
 对外提供管理控制台需要的全部数据：
   - /admin/stats   总览指标（含 24h 趋势、错误率、延迟分位、Top 接口、系统信息）
-  - /admin/users   用户列表（搜索 / 套餐 / 状态 筛选 + 分页）
+  - /admin/users   用户列表（搜索 / 档位 / 状态 筛选 + 分页）
   - /admin/keys    全量 API Key（筛选 + 分页）
   - /admin/logs    调用日志（筛选 + 分页）
-  - /admin/plans   套餐管理（新建 / 改价 / 改配额 / 上下架 / 删除）
-  - /admin/orders  订单管理（筛选 / 分页 / 手工确认到账）
-  - 各类写操作：改套餐、启禁用、重置密码、删除用户、吊销/删除密钥、调整余额
+  - /admin/plans   档位管理（新建 / 改配额 / 上下架 / 删除）
+  - 各类写操作：指派档位、启禁用、重置密码、删除用户、吊销/删除密钥
+
+开源版本不售卖任何东西，所以这里没有订单、账单、余额相关接口。
+「档位（plan）」只是配额档位，不是商品。
 
 注意：**统计全部走 SQL 聚合，不在 Python 里全表遍历**，
 只有分位数（P95）这种 SQL 方言差异大的才拉回内存算，并设了上限保护。
@@ -28,8 +30,7 @@ from app.auth import hash_password
 from app.config import settings
 from app.db import get_db
 from app.deps import get_admin
-from app.models import ApiKey, ApiLog, BalanceLog, Order, Plan, StockMeta, User
-from app.pay import settle_order
+from app.models import ApiKey, ApiLog, Plan, StockMeta, User
 from app.plans import (
     DEFAULT_PLANS,
     FALLBACK_PLAN,
@@ -38,12 +39,10 @@ from app.plans import (
     invalidate_plan_cache,
     invalidate_usage_cache,
     list_plans,
-    yuan,
 )
 from app.ratelimit import blacklist_key, redis_status
 from app.schemas import (
     ApiResponse,
-    BalanceAdjustIn,
     PlanIn,
     PlanUpdateIn,
 )
@@ -53,7 +52,7 @@ router = APIRouter(prefix="/admin", tags=["管理后台"])
 #: 进程启动时刻，用于计算运行时长
 _STARTED_AT = time.time()
 
-#: 兜底套餐代码。库里套餐被删光时至少还有免费版可用。
+#: 兜底档位代码。库里档位被删光时至少还有 free 可用。
 TIERS = tuple(p["code"] for p in DEFAULT_PLANS) or ("free",)
 
 
@@ -89,7 +88,7 @@ def _calls_by_user(db: Session, since: datetime) -> dict[int, int]:
 
 
 def _plan_map(db: Session) -> dict[str, dict]:
-    """code -> 套餐配置。查不到时补一个兜底，避免展示层 KeyError。"""
+    """code -> 档位配置。查不到时补一个兜底，避免展示层 KeyError。"""
     m = {p["code"]: p for p in list_plans(db)}
     m.setdefault(FALLBACK_PLAN["code"], dict(FALLBACK_PLAN))
     return m
@@ -107,15 +106,6 @@ def _user_row(u: User, kc: dict[int, int], calls: dict[int, int],
         "is_active": u.is_active,
         "created_at": u.created_at,
         "last_login": u.last_login,
-        "balance": u.balance or 0,
-        "plan_expires_at": u.plan_expires_at,
-        #: 后台要能一眼看出"这是试用用户还是付费用户、还有几天、是否已停用"
-        "is_trial": bool(u.is_trial),
-        "days_left": (
-            None if not u.plan_expires_at
-            else max(0, (u.plan_expires_at - datetime.utcnow()).days)
-        ),
-        "expired": bool(u.plan_expires_at and u.plan_expires_at < datetime.utcnow()),
         "active_keys": kc.get(u.id, 0),
         "key_quota": p.get("max_keys", 3),
         "calls_24h": calls.get(u.id, 0),
@@ -139,62 +129,6 @@ def _key_row(k: ApiKey, email: str) -> dict:
     }
 
 
-#: 订单类型 -> 中文名（前端展示用，避免把枚举散落在页面里）
-KIND_LABELS = {
-    "recharge": "充值",
-    "upgrade": "套餐升级",
-    "renew": "套餐续费",
-    "downgrade": "套餐变更",
-}
-STATUS_LABELS = {
-    "pending": "待支付", "paid": "已支付", "failed": "支付失败",
-    "cancelled": "已取消", "refunded": "已退款",
-}
-BILL_LABELS = {
-    "recharge": "充值入账", "consume": "消费扣款", "refund": "退款",
-    "grant": "管理员赠送", "deduct": "管理员扣减",
-}
-
-
-def _order_row(o: Order, email: str = "-") -> dict:
-    return {
-        "id": o.id,
-        "order_no": o.order_no,
-        "user_id": o.user_id,
-        "user_email": email,
-        "kind": o.kind,
-        "kind_label": KIND_LABELS.get(o.kind, o.kind),
-        "title": o.title,
-        "amount": o.amount,
-        "amount_yuan": yuan(o.amount or 0),
-        "plan_code": o.plan_code,
-        "period": o.period,
-        "pay_channel": o.pay_channel,
-        "status": o.status,
-        "status_label": STATUS_LABELS.get(o.status, o.status),
-        "trade_no": o.trade_no,
-        "remark": o.remark,
-        "created_at": o.created_at,
-        "paid_at": o.paid_at,
-    }
-
-
-def _bill_row(b: BalanceLog) -> dict:
-    return {
-        "id": b.id,
-        "user_id": b.user_id,
-        "amount": b.amount,
-        "amount_yuan": yuan(b.amount or 0),
-        "balance_after": b.balance_after,
-        "balance_after_yuan": yuan(b.balance_after or 0),
-        "type": b.type,
-        "type_label": BILL_LABELS.get(b.type, b.type),
-        "ref": b.ref,
-        "remark": b.remark,
-        "created_at": b.created_at,
-    }
-
-
 # ---------------------------------------------------------------- 总览
 @router.get("/stats", summary="系统总览")
 def stats(db: Session = Depends(get_db), _u=Depends(get_admin)):
@@ -215,7 +149,7 @@ def stats(db: Session = Depends(get_db), _u=Depends(get_admin)):
         db.query(func.count(User.id)).filter(User.is_active.is_(False)).scalar() or 0
     )
     plans = list_plans(db)
-    #: 套餐是后台可自定义的，分布字典必须按库里的套餐动态建，不能写死三档
+    #: 档位是后台可自定义的，分布字典必须按库里的档位动态建，不能写死三档
     tiers_meta = [
         {"code": p["code"], "name": p["name"], "count": 0, "level": p["level"]}
         for p in sorted(plans, key=lambda x: (x["sort_order"], x["level"]))
@@ -324,20 +258,6 @@ def stats(db: Session = Depends(get_db), _u=Depends(get_admin)):
     # ---- 数据资产
     stock_meta = db.query(func.count(StockMeta.id)).scalar() or 0
 
-    # ---- 营收概览（订单 + 余额）
-    paid_amount = (
-        db.query(func.sum(Order.amount))
-        .filter(Order.status == "paid", Order.kind == "recharge")
-        .scalar() or 0
-    )
-    paid_orders = (
-        db.query(func.count(Order.id)).filter(Order.status == "paid").scalar() or 0
-    )
-    pending_orders = (
-        db.query(func.count(Order.id)).filter(Order.status == "pending").scalar() or 0
-    )
-    balance_total = db.query(func.sum(User.balance)).scalar() or 0
-
     return ApiResponse(data={
         "users": users,
         "users_new_7d": users_7d,
@@ -345,14 +265,6 @@ def stats(db: Session = Depends(get_db), _u=Depends(get_admin)):
         "users_disabled": disabled,
         "tier_counts": tier_counts,
         "tiers": tiers_meta,
-        "revenue": {
-            "paid_amount": paid_amount,
-            "paid_amount_yuan": yuan(paid_amount),
-            "paid_orders": paid_orders,
-            "pending_orders": pending_orders,
-            "balance_total": balance_total,
-            "balance_total_yuan": yuan(balance_total),
-        },
         "api_keys": keys,
         "active_keys": active_keys,
         "revoked_keys": keys - active_keys,
@@ -409,7 +321,7 @@ def list_users(
     if q:
         like = f"%{q.strip()}%"
         query = query.filter(or_(User.email.ilike(like), User.id == _as_int(q)))
-    #: 套餐是后台自定义的，这里不写死枚举，传什么过滤什么
+    #: 档位是后台自定义的，这里不写死枚举，传什么过滤什么
     if tier and tier != "all":
         query = query.filter(User.tier == tier)
     if status == "active":
@@ -458,20 +370,11 @@ def user_detail(user_id: int, db: Session = Depends(get_db), _u=Depends(get_admi
         db.query(func.count(ApiLog.id)).filter(ApiLog.user_id == u.id).scalar() or 0
     )
 
-    orders = db.query(Order).filter(Order.user_id == u.id).order_by(
-        Order.created_at.desc()
-    ).limit(10).all()
-    bills = db.query(BalanceLog).filter(BalanceLog.user_id == u.id).order_by(
-        BalanceLog.created_at.desc()
-    ).limit(10).all()
-
     return ApiResponse(data={
         "user": _user_row(u, _key_counts(db), {}, _plan_map(db)),
         "calls_24h": calls_24h,
         "calls_total": calls_total,
         "keys": [_key_row(k, u.email) for k in keys],
-        "orders": [_order_row(o, u.email) for o in orders],
-        "bills": [_bill_row(b) for b in bills],
         "recent_logs": [{
             "id": l.id, "path": l.path, "status": l.status,
             "latency_ms": l.latency_ms, "ts": l.ts,
@@ -493,128 +396,36 @@ def toggle_user(user_id: int, db: Session = Depends(get_db), _u=Depends(get_admi
 
 
 class TierIn(BaseModel):
-    #: 套餐代码可以是后台自定义的任意 code，所以只校验长度与字符集
+    #: 档位代码可以是后台自定义的任意 code，所以只校验长度与字符集
     tier: str = Field(min_length=1, max_length=32)
 
 
-@router.post("/users/{user_id}/tier", summary="调整用户套餐")
+@router.post("/users/{user_id}/tier", summary="调整用户配额档位")
 def set_tier(user_id: int, payload: TierIn | None = None, tier: str | None = None,
              db: Session = Depends(get_db), _u=Depends(get_admin)):
-    """同时兼容 body（{"tier":"pro"}）与 query（?tier=pro）两种调用方式。"""
+    """同时兼容 body（{"tier":"pro"}）与 query（?tier=pro）两种调用方式。
+
+    开源版本没有买卖，这里的语义是**管理员给这个用户指派一档额度**，
+    而不是"卖套餐"。
+    """
     value = (payload.tier if payload else None) or tier
     if not value:
-        raise HTTPException(400, "缺少套餐代码")
+        raise HTTPException(400, "缺少档位代码")
     u = db.scalar(select(User).where(User.id == user_id))
     if not u:
         raise HTTPException(404, "用户不存在")
     plan = get_plan(db, value)
     if not get_plan_row(db, value):
-        raise HTTPException(400, f"套餐 {value} 不存在，请到「套餐管理」先创建")
+        raise HTTPException(400, f"档位 {value} 不存在，请到「档位管理」先创建")
 
     u.tier = value
-    #: 换成免费/永久套餐时清掉到期时间，避免界面上还挂着过期日
-    if plan["price_month"] == 0 and plan["price_year"] == 0:
-        u.plan_expires_at = None
-    #: 管理员指派套餐视为"手动授权"，不再是新用户试用
-    u.is_trial = False
     db.commit()
     invalidate_usage_cache(user_id)
     return ApiResponse(
         msg=f"已调整为「{plan['name']}」（Key 上限 {plan['max_keys']}，"
-            f"限流 {plan['rate_limit']}/分钟）",
+            f"限流 {plan['rate_limit']}/分钟，日配额 "
+            f"{'不限' if plan['daily_quota'] < 0 else plan['daily_quota']}）",
         data={"id": user_id, "tier": value, "tier_name": plan["name"]},
-    )
-
-
-class ExpiryIn(BaseModel):
-    """调整用户套餐有效期。
-
-    三种用法：
-      days=N      —— 从现在起顺延 N 天（N<=0 表示立即到期）
-      expires_at  —— 指定具体时间（ISO 格式）
-      clear=true  —— 清除到期时间，变成长期有效
-    """
-
-    days: int | None = Field(default=None, ge=-3650, le=3650)
-    expires_at: datetime | None = None
-    clear: bool = False
-
-
-@router.post("/users/{user_id}/expiry", summary="调整用户套餐有效期")
-def set_expiry(user_id: int, payload: ExpiryIn,
-               db: Session = Depends(get_db), _u=Depends(get_admin)):
-    """后台改有效期：给用户延几天、提前作废、或改成永久。
-
-    典型场景：用户续费时走线下转账，管理员收到钱后在这里手动延长。
-    """
-    u = db.scalar(select(User).where(User.id == user_id))
-    if not u:
-        raise HTTPException(404, "用户不存在")
-
-    now = datetime.utcnow()
-    if payload.clear:
-        u.plan_expires_at = None
-        msg = "已设为长期有效"
-    elif payload.expires_at is not None:
-        u.plan_expires_at = payload.expires_at
-        msg = f"有效期已设为 {payload.expires_at.strftime('%Y-%m-%d %H:%M')}"
-    elif payload.days is not None:
-        if payload.days <= 0:
-            u.plan_expires_at = now
-            msg = "已设为立即到期"
-        else:
-            #: 未到期就在原到期日上顺延，不吞掉用户已买的天数
-            base = u.plan_expires_at if (u.plan_expires_at and u.plan_expires_at > now) else now
-            u.plan_expires_at = base + timedelta(days=payload.days)
-            msg = f"已顺延 {payload.days} 天，有效期至 {u.plan_expires_at.strftime('%Y-%m-%d')}"
-    else:
-        raise HTTPException(400, "请提供 days / expires_at / clear 之一")
-
-    #: 手动改过期时间属于**管理员授权**，不该再顶着"试用"标签
-    u.is_trial = False
-    db.commit()
-    invalidate_usage_cache(user_id)
-    return ApiResponse(msg=msg, data={
-        "id": user_id,
-        "plan_expires_at": u.plan_expires_at,
-        "is_trial": u.is_trial,
-    })
-
-
-@router.post("/users/{user_id}/balance", summary="手工调整用户余额")
-def adjust_balance(user_id: int, payload: BalanceAdjustIn,
-                   db: Session = Depends(get_db), _u=Depends(get_admin)):
-    """赠送 / 扣减余额。amount 单位「分」，正数为赠送，负数为扣减。
-
-    扣减不允许把余额弄成负数 —— 否则用户会处于"欠费"状态，账单对不上。
-    """
-    u = db.scalar(select(User).where(User.id == user_id))
-    if not u:
-        raise HTTPException(404, "用户不存在")
-    amount = int(payload.amount)
-    if amount == 0:
-        raise HTTPException(400, "变动金额不能为 0")
-    new_balance = (u.balance or 0) + amount
-    if new_balance < 0:
-        raise HTTPException(
-            400, f"余额不足：当前 ¥{yuan(u.balance or 0)}，无法扣减 ¥{yuan(-amount)}"
-        )
-
-    u.balance = new_balance
-    db.add(BalanceLog(
-        user_id=u.id,
-        amount=amount,
-        balance_after=new_balance,
-        type="grant" if amount > 0 else "deduct",
-        ref=None,
-        remark=payload.remark or (f"管理员 {_u.email} 手工调整"),
-        created_at=datetime.utcnow(),
-    ))
-    db.commit()
-    verb = "赠送" if amount > 0 else "扣减"
-    return ApiResponse(
-        msg=f"已{verb} ¥{yuan(abs(amount))}，当前余额 ¥{yuan(new_balance)}",
-        data={"id": user_id, "balance": new_balance, "balance_yuan": yuan(new_balance)},
     )
 
 
@@ -653,14 +464,6 @@ def delete_user(user_id: int, db: Session = Depends(get_db), _u=Depends(get_admi
 
     n_keys = db.query(func.count(ApiKey.id)).filter(ApiKey.user_id == u.id).scalar() or 0
     db.query(ApiKey).filter(ApiKey.user_id == u.id).delete(synchronize_session=False)
-    #: 订单与余额流水必须跟着删。SQLite 的 INTEGER PRIMARY KEY 会复用已删除的 id，
-    #: 若留下孤儿记录，新注册用户会"继承"上一个人的账单（PG 的序列不复用，但行为要一致）。
-    n_orders = db.query(func.count(Order.id)).filter(Order.user_id == u.id).scalar() or 0
-    n_bills = (
-        db.query(func.count(BalanceLog.id)).filter(BalanceLog.user_id == u.id).scalar() or 0
-    )
-    db.query(Order).filter(Order.user_id == u.id).delete(synchronize_session=False)
-    db.query(BalanceLog).filter(BalanceLog.user_id == u.id).delete(synchronize_session=False)
     db.delete(u)
     db.commit()
     # api_logs 保留（调用审计需要），只是 user_id 变成孤儿引用
@@ -748,21 +551,21 @@ def admin_purge_key(key_id: int, db: Session = Depends(get_db),
     return ApiResponse(msg="已永久删除", data={"id": key_id})
 
 
-# ---------------------------------------------------------------- 套餐
-@router.get("/plans", summary="全部套餐（含隐藏套餐）")
+# ---------------------------------------------------------------- 档位
+@router.get("/plans", summary="全部档位（含隐藏档位）")
 def list_all_plans(db: Session = Depends(get_db), _u=Depends(get_admin)):
     plans = list_plans(db)
-    #: 统计每个套餐下有多少用户，删除前给个提示
+    #: 统计每个档位下有多少用户，删除前给个提示
     used = dict(db.query(User.tier, func.count(User.id)).group_by(User.tier).all())
     for p in plans:
         p["users"] = used.get(p["code"], 0)
     return ApiResponse(data={"items": plans, "total": len(plans)})
 
 
-@router.post("/plans", summary="新建套餐")
+@router.post("/plans", summary="新建档位")
 def create_plan(payload: PlanIn, db: Session = Depends(get_db), _u=Depends(get_admin)):
     if get_plan_row(db, payload.code):
-        raise HTTPException(400, f"套餐代码 {payload.code} 已存在")
+        raise HTTPException(400, f"档位代码 {payload.code} 已存在")
     p = Plan(
         **payload.model_dump(),
         created_at=datetime.utcnow(),
@@ -771,150 +574,43 @@ def create_plan(payload: PlanIn, db: Session = Depends(get_db), _u=Depends(get_a
     db.add(p)
     db.commit()
     invalidate_plan_cache()
-    return ApiResponse(msg=f"套餐「{p.name}」已创建", data={"code": p.code})
+    return ApiResponse(msg=f"档位「{p.name}」已创建", data={"code": p.code})
 
 
-@router.put("/plans/{code}", summary="修改套餐")
+@router.put("/plans/{code}", summary="修改档位")
 def update_plan(code: str, payload: PlanUpdateIn,
                 db: Session = Depends(get_db), _u=Depends(get_admin)):
     p = get_plan_row(db, code)
     if not p:
-        raise HTTPException(404, "套餐不存在")
+        raise HTTPException(404, "档位不存在")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
     p.updated_at = datetime.utcnow()
     db.commit()
     invalidate_plan_cache()
     return ApiResponse(
-        msg=f"套餐「{p.name}」已更新，配额即时生效",
+        msg=f"档位「{p.name}」已更新，配额即时生效",
         data={"code": p.code, "max_keys": p.max_keys,
               "rate_limit": p.rate_limit, "daily_quota": p.daily_quota},
     )
 
 
-@router.delete("/plans/{code}", summary="删除套餐")
+@router.delete("/plans/{code}", summary="删除档位")
 def delete_plan(code: str, db: Session = Depends(get_db), _u=Depends(get_admin)):
     p = get_plan_row(db, code)
     if not p:
-        raise HTTPException(404, "套餐不存在")
+        raise HTTPException(404, "档位不存在")
     if code in ("free",):
-        raise HTTPException(400, "免费版是注册默认套餐，不能删除（可改为停用）")
+        raise HTTPException(400, "free 是注册默认档位，不能删除（可改为停用）")
     n = db.query(func.count(User.id)).filter(User.tier == code).scalar() or 0
     if n:
         raise HTTPException(
-            400, f"还有 {n} 个用户在使用该套餐，请先把他们迁移到其他套餐再删除"
+            400, f"还有 {n} 个用户在使用该档位，请先把他们迁移到其他档位再删除"
         )
     db.delete(p)
     db.commit()
     invalidate_plan_cache()
-    return ApiResponse(msg=f"套餐「{p.name}」已删除", data={"code": code})
-
-
-# ---------------------------------------------------------------- 订单
-@router.get("/orders", summary="订单列表（支持筛选/分页）")
-def list_orders(
-    q: str | None = None,
-    kind: str = Query("all", pattern="^(all|recharge|upgrade|renew|downgrade)$"),
-    status: str = Query("all", pattern="^(all|pending|paid|failed|cancelled|refunded)$"),
-    user_id: int | None = None,
-    offset: int = 0,
-    limit: int = Query(20, ge=1, le=200),
-    db: Session = Depends(get_db),
-    _u=Depends(get_admin),
-):
-    query = db.query(Order)
-    if kind != "all":
-        query = query.filter(Order.kind == kind)
-    if status != "all":
-        query = query.filter(Order.status == status)
-    if user_id:
-        query = query.filter(Order.user_id == user_id)
-    if q:
-        like = f"%{q.strip()}%"
-        owner_ids = [uid for (uid,) in db.query(User.id).filter(User.email.ilike(like)).all()]
-        conds = [Order.order_no.ilike(like), Order.title.ilike(like)]
-        if owner_ids:
-            conds.append(Order.user_id.in_(owner_ids))
-        query = query.filter(or_(*conds))
-
-    total, rows = _paginate(db, query.order_by(Order.created_at.desc()), offset, limit)
-    emails = {}
-    if rows:
-        uids = {r.user_id for r in rows}
-        emails = {u.id: u.email for u in db.query(User).filter(User.id.in_(uids)).all()}
-
-    paid_sum = (
-        db.query(func.sum(Order.amount))
-        .filter(Order.status == "paid", Order.kind == "recharge")
-        .scalar() or 0
-    )
-    return ApiResponse(data={
-        "total": total,
-        "offset": offset,
-        "limit": limit,
-        "paid_amount": paid_sum,
-        "paid_amount_yuan": yuan(paid_sum),
-        "items": [_order_row(r, emails.get(r.user_id, "-")) for r in rows],
-    })
-
-
-@router.post("/orders/{order_no}/confirm", summary="手工确认充值到账")
-def confirm_order(order_no: str, db: Session = Depends(get_db), _u=Depends(get_admin)):
-    """给「线下转账 / 手动支付」这类渠道用：管理员确认钱到账后手动置为已支付。
-
-    与用户自助支付走同一段入账逻辑（_settle_order），保证余额与流水一致。
-    """
-    o = db.scalar(select(Order).where(Order.order_no == order_no))
-    if not o:
-        raise HTTPException(404, "订单不存在")
-    if o.status == "paid":
-        return ApiResponse(msg="该订单已是已支付状态", data={"order_no": order_no})
-    if o.status in ("cancelled", "refunded"):
-        raise HTTPException(400, f"订单已{o.status}，无法确认")
-
-    ok, msg = settle_order(db, o, trade_no=o.trade_no or f"manual-{_u.id}")
-    if not ok:
-        raise HTTPException(400, msg)
-    return ApiResponse(
-        msg=f"已确认到账 ¥{yuan(o.amount)}，余额已增加",
-        data={"order_no": order_no, "status": "paid"},
-    )
-
-
-@router.post("/orders/{order_no}/cancel", summary="取消订单")
-def cancel_order(order_no: str, db: Session = Depends(get_db), _u=Depends(get_admin)):
-    o = db.scalar(select(Order).where(Order.order_no == order_no))
-    if not o:
-        raise HTTPException(404, "订单不存在")
-    if o.status == "paid":
-        raise HTTPException(400, "已支付订单不能取消，如需撤销请走退款流程")
-    o.status = "cancelled"
-    o.updated_at = datetime.utcnow()
-    db.commit()
-    return ApiResponse(msg="订单已取消", data={"order_no": order_no})
-
-
-@router.get("/bills", summary="余额流水（支持筛选/分页）")
-def list_bills(
-    user_id: int | None = None,
-    type: str = Query("all", pattern="^(all|recharge|consume|refund|grant|deduct)$"),
-    offset: int = 0,
-    limit: int = Query(20, ge=1, le=200),
-    db: Session = Depends(get_db),
-    _u=Depends(get_admin),
-):
-    query = db.query(BalanceLog)
-    if user_id:
-        query = query.filter(BalanceLog.user_id == user_id)
-    if type != "all":
-        query = query.filter(BalanceLog.type == type)
-    total, rows = _paginate(
-        db, query.order_by(BalanceLog.created_at.desc()), offset, limit
-    )
-    return ApiResponse(data={
-        "total": total, "offset": offset, "limit": limit,
-        "items": [_bill_row(r) for r in rows],
-    })
+    return ApiResponse(msg=f"档位「{p.name}」已删除", data={"code": code})
 
 
 # ---------------------------------------------------------------- 日志

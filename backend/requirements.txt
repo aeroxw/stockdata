@@ -13,6 +13,3 @@ argon2-cffi==23.1.0
 python-multipart==0.0.20
 apscheduler==3.11.0
 email-validator==2.2.0
-#: 支付二维码生成。纯 Python、无任何二级依赖（76KB），
-#: 直接输出 SVG data URI，不需要 pillow。
-segno==1.6.6

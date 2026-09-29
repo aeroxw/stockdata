@@ -97,8 +97,8 @@ def main():
     # [7] 模拟过期：直接用伪造/损坏的 access_token 打业务接口应 401
     s, _ = req("GET", "/api/v1/auth/me", token="eyJhbGciOiJIUzI1NiJ9.broken.sig")
     check(7, "损坏的 access_token 被拒 401", s == 401, f"status={s}")
-    s, _ = req("GET", "/api/v1/billing/me", token=at2)
-    check(7.1, "续期后的令牌可访问 billing 接口", s == 200, f"status={s}")
+    s, _ = req("GET", "/api/v1/quota/me", token=at2)
+    check(7.1, "续期后的令牌可访问配额接口", s == 200, f"status={s}")
 
     # [8] 不存在的用户
     from datetime import datetime, timedelta, timezone

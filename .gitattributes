@@ -1,0 +1,10 @@
+# 统一用 LF 换行。
+# 原因：容器里跑的是 Linux，CRLF 的 .py / Dockerfile / .conf 会直接崩
+# （upload.py 以前靠"上传时转 LF"兜底，不如在仓库层面就定死）。
+* text=auto eol=lf
+
+# 二进制不要做换行转换
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary

@@ -266,7 +266,7 @@ h1.hero-title {
 .code-body .f { color: #7aa5ff; }
 .code-body .n { color: #ffb86c; }
 
-/* ---------------- 套餐 ---------------- */
+/* ---------------- 价格 / 档位卡片 ---------------- */
 .price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
 .price-card {
   padding: 32px 28px; border-radius: var(--radius-lg);
@@ -346,7 +346,7 @@ td { padding: 14px; font-size: 14px; border-bottom: 1px solid var(--border-soft)
 tbody tr:hover { background: rgba(61,125,255,.05); }
 .mono { font-family: var(--mono); font-size: 13px; }
 
-/* 表格内嵌的套餐选择框 */
+/* 表格内嵌的档位选择框 */
 .tier-select {
   padding: 5px 10px; border-radius: 7px; font-size: 12.5px; font-weight: 700;
   font-family: var(--mono); letter-spacing: .4px;
@@ -908,7 +908,7 @@ table.mini td, table.mini th { padding: 9px 10px; }
 .toast-out { opacity: 0; transform: translateX(16px); }
 @keyframes toastIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 
-/* 套餐小徽章 */
+/* 档位小徽章 */
 .tier-pill {
   display: inline-block; padding: 2px 9px; border-radius: 100px;
   font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: .4px;

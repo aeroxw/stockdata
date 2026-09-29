@@ -109,7 +109,7 @@ def preclean():
     from sqlalchemy import select
 
     from app.db import SessionLocal
-    from app.models import ApiKey, ApiLog, BalanceLog, Order, User
+    from app.models import ApiKey, ApiLog, User
 
     s = SessionLocal()
     try:
@@ -121,8 +121,6 @@ def preclean():
                 continue
             if not em.split("@")[0].startswith(prefixes):
                 continue
-            s.query(Order).filter(Order.user_id == u.id).delete(synchronize_session=False)
-            s.query(BalanceLog).filter(BalanceLog.user_id == u.id).delete(synchronize_session=False)
             s.query(ApiLog).filter(ApiLog.user_id == u.id).delete(synchronize_session=False)
             s.query(ApiKey).filter(ApiKey.user_id == u.id).delete(synchronize_session=False)
             s.delete(u)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -15,11 +15,9 @@ from app.auth import (
     hash_password,
     verify_password,
 )
-from app.config import settings
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import User
-from app.plans import get_plan_row
 from app.schemas import ApiResponse, LoginIn, RefreshIn, RegisterIn, TokenOut, UserOut
 
 router = APIRouter(prefix="/auth", tags=["用户"])
@@ -33,26 +31,14 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     # 第一个注册的用户自动成为管理员，方便开箱即用
     is_first = db.scalar(select(User).limit(1)) is None
 
-    #: 新用户试用期：注册即给 TRIAL_DAYS 天体验，到期时间记在 plan_expires_at，
-    #: 和付费套餐共用一套判断逻辑。
-    now = datetime.utcnow()
-    tier, expires, is_trial = "free", None, False
-    if settings.TRIAL_ENABLED and settings.TRIAL_DAYS > 0:
-        # 试用套餐可能已被后台删除/改名，查不到就退回 free ——
-        # 不能让"配了个不存在的套餐"把注册流程搞成 500。
-        row = get_plan_row(db, settings.TRIAL_PLAN or "free")
-        tier = row.code if row else "free"
-        expires = now + timedelta(days=settings.TRIAL_DAYS)
-        is_trial = True
-
+    #: 新用户一律落到默认档（free）。开源版不售卖任何套餐，也不设试用期 ——
+    #: 想要更大额度就让管理员在后台改档位。
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),
-        tier=tier,
+        tier="free",
         is_admin=is_first,
-        created_at=now,
-        plan_expires_at=expires,
-        is_trial=is_trial,
+        created_at=datetime.utcnow(),
     )
     db.add(user)
     db.commit()

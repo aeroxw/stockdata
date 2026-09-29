@@ -20,6 +20,11 @@
 #   upstream、backend/Dockerfile 的 EXPOSE + CMD --port
 #
 # 部署路径建议：/volume1/docker/stockdata/
+#
+# ⚠️ 下面 environment 里 ${VAR:-...} 的**默认值取自作者的自用环境**
+#    （easy-tdx / 开盘了代理跑在内网 10.31.0.x）。换到你自己的机器上时，
+#    请通过同目录 .env 覆盖，或直接改成你的地址 —— 否则这两家数据源连不上。
+#    密码与 JWT_SECRET 的默认值 change_me 只是占位，生产必须换掉。
 
 services:
   postgres:

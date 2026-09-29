@@ -1,0 +1,49 @@
+StockData — 多源 A 股金融数据整合平台
+Copyright 2026 StockData contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+本产品包含 / 依赖以下第三方软件，各自遵循其原有许可证：
+--------------------------------------------------------------------------
+后端运行时
+  FastAPI                     MIT           https://github.com/fastapi/fastapi
+  Uvicorn                     BSD-3-Clause  https://github.com/encode/uvicorn
+  SQLAlchemy                  MIT           https://www.sqlalchemy.org
+  psycopg                     LGPL-2.1      https://www.psycopg.org/psycopg3/
+  Alembic                     MIT           https://alembic.sqlalchemy.org
+  Pydantic / pydantic-settings MIT         https://github.com/pydantic/pydantic
+  HTTPX                       BSD-3-Clause  https://github.com/encode/httpx
+  Redis-py                    MIT           https://github.com/redis/redis-py
+  python-jose                 MIT           https://github.com/mpdavis/python-jose
+  passlib / argon2-cffi       BSD / Apache-2.0
+  APScheduler                 MIT           https://github.com/agronholm/apscheduler
+  email-validator             CC0-1.0       https://github.com/JoshData/python-email-validator
+
+基础镜像
+  PostgreSQL 16 (alpine)      PostgreSQL License
+  Redis 7 (alpine)            BSD-3-Clause
+  Nginx (alpine)              BSD-2-Clause
+
+以上许可证均为宽松型（permissive），不存在 copyleft 传染性。
+
+关于数据
+--------------------------------------------------------------------------
+本项目**不拥有、不分发任何上游数据**。所有行情、K 线、财报、特色数据均在
+运行时由下列数据源的公开接口取得，其使用受各自服务条款约束：
+
+  · 通达信（easy-tdx 自建服务）
+  · 同花顺（iFinD / fuyao 开放接口）
+  · 开盘了（经本地代理）
+  · 东方财富
+  · 新浪财经
+  · 腾讯财经
+
+本项目仅提供「统一接入与聚合」的代码（适配器、缓存、限流、鉴权、控制台）。
+自部署时数据在你的网络内直接流向你的用户，不经本项目作者之手；
+使用公开实例或对外提供服务前，请自行确认符合上游条款与所在地法律法规。
+
+本项目不构成投资建议，数据可能存在延迟或误差，作者不对数据准确性作任何担保。

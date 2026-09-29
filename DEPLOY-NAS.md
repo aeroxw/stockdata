@@ -1,41 +1,20 @@
-# StockData 部署到绿联 NAS（先部署、支付后补版）
+# StockData 部署到绿联 NAS
 
 > **状态：已上线** ✅
-> 地址 `http://NAS_INTERNAL_IP:9850/`，5 个容器全部 Up，自动验收 17/17 通过。
+> 地址 `http://NAS_INTERNAL_IP:9850/`，5 个容器全部 Up。
 > 管理员 `admin@example.com`。
-
-**结论：可以先部署。** 当前版本功能完整、回归 6/6 全绿，
-唯一不能对外的是「真实收款」—— 已在部署配置里把模拟支付关掉，
-所以现在上线是安全的：站点能完整跑通，只是收不到钱。
+>
+> **开源版说明**：本项目已移除全部支付与售卖功能（`paygate/`、订单、余额已删）。
+> 额度一律由管理员在后台「档位管理」指派，不存在"充钱换配额"的通路。
 
 **日常重新部署**（改完代码后）：
 ```bash
-python -u tools/upload.py && python -u tools/deploy.py 2 && python -u tools/acceptance.py
+python -u tools/upload.py && python -u tools/deploy.py 2 && python -u tools/healthcheck.py
 ```
 
 ---
 
-## 一、部署前必读：已经堵掉的口子
-
-余额可以直接买套餐（VIP = 每分钟 1200 次、不限日调用量），
-所以**任何"一点就到账"的充值通道都等于白送配额**。
-原本有两条白嫖路径，都已堵掉：
-
-| 路径 | 原状 | 现在 |
-|---|---|---|
-| `mock` 渠道自助 `/pay` | 登录用户点一下立刻到账 | `ALLOW_MOCK_PAY=false` 时 403 |
-| `manual` 渠道自助 `/pay` | **绕过后台确认**直接入账 | 一律拒绝，必须后台确认 |
-
-配置位置：
-- `docker-compose.yaml` → `api.environment.ALLOW_MOCK_PAY: "false"` ← 已设好，**别改回 true**
-- `backend/.env` → `ALLOW_MOCK_PAY=true`（只管本地测试，不会被打包进镜像）
-
-用户现在能用的充值方式只剩 **线下转账**（下单 → 你后台确认到账），
-功能完整，只是需要你手工点一下。
-
----
-
-## 二、部署步骤
+## 一、部署步骤
 
 ### 1. 在 NAS 上准备目录
 
@@ -51,9 +30,27 @@ sudo chmod -R 777 data/postgres data/redis
 
 > `init/` 是 PG 的初始化脚本目录，留空即可（表结构由 SQLAlchemy 自己建）。
 
-### 2. 上传文件 —— 一条命令搞定
+### 2. 首次部署前：填好环境变量
 
-项目里已经备好脚本，**不用手工 scp**：
+```bash
+cp .env.example .env       # 项目根目录，docker compose 会自动加载
+```
+
+至少改这两项：
+
+| 变量 | 生成方式 |
+|---|---|
+| `POSTGRES_PASSWORD` | 自己定一个强密码 |
+| `JWT_SECRET` | `openssl rand -base64 48` |
+
+`EASYTDX_BASE` / `KPL_PROXY_BASE` 指向你自己搭的服务（本项目不含），
+没搭就留 localhost，对应数据源会自动降级。
+
+> ⚠️ 用**绿联 Container Manager UI** 时 UI 不会读 `.env`，
+> 那些 `${VAR:-默认值}` 会落到默认值上 —— 必须把 compose 里
+> `environment:` 的值手改成真实值（密码尤其别留 `change_me`）。
+
+### 3. 上传文件 —— 一条命令搞定
 
 ```bash
 python -u tools/upload.py          # 传代码，自动转 LF、排除 .pyc/.env/.db
@@ -68,7 +65,7 @@ python -u tools/upload.py          # 传代码，自动转 LF、排除 .pyc/.env
 > `environment:`（绿联 UI 不认 `env_file:`）。
 > 也别传 `backend/stockdata.db`（那是本地 SQLite，NAS 上用 PG）。
 
-### 3. 确认 9850 没被占用
+### 4. 确认 9850 没被占用
 
 ```bash
 sudo netstat -tlnp | grep -E '9850|8000|8018'
@@ -77,7 +74,7 @@ sudo netstat -tlnp | grep -E '9850|8000|8018'
 - `8000` = easy-tdx、`8018` = kpl-proxy，**都别动**
 - `9850` 应该是空的；如果被占，改 `docker-compose.yaml` 的 `ports`
 
-### 4. 构建并启动
+### 5. 构建并启动
 
 ```bash
 python -u tools/deploy.py 1     # 先起 postgres / redis（秒级）
@@ -86,7 +83,7 @@ python -u tools/deploy.py 2     # 再构建 api / collector / nginx（约 1~2 �
 
 或者一条到底：`python -u tools/deploy.py all`
 
-> 首次构建实测 **约 90 秒**（两个 Python 镜像并行编），比预想快很多。
+> 首次构建实测 **约 90 秒**（两个 Python 镜像并行编）。
 
 <details>
 <summary>也可以用绿联 Container Manager UI（点这里展开）</summary>
@@ -101,37 +98,39 @@ python -u tools/deploy.py 2     # 再构建 api / collector / nginx（约 1~2 �
 
 </details>
 
-### 5. 验收
+### 6. 验收
 
 ```bash
-python -u tools/acceptance.py      # 17 项自动验收
+python -u tools/healthcheck.py     # 接口体检
+python -u tools/acceptance.py      # 端到端验收
 ```
 
-### 6. 首访：注册管理员
+### 7. 首访：注册管理员
 
 浏览器打开 `http://NAS_INTERNAL_IP:9850/`
 
 **第一个注册的账号自动成为管理员**（`is_first → is_admin=True`）。
-所以注册完立刻就是后台管理员，别再注册第二个然后再想着升级。
+新用户一律落到默认档 `free`，额度不够就在后台给他换档。
 
 ---
 
-## 三、验收清单
+## 二、验收清单
 
 | 项 | 预期 |
 |---|---|
-| `http://NAS_INTERNAL_IP:9850/` | 首页正常 |
+| `http://NAS_INTERNAL_IP:9850/` | 首页正常，底部是「开源与自建」，**没有定价区** |
 | 注册 + 登录 | 通过，进控制台 |
-| 控制台「用量统计」 | 图表正常，数字清晰 |
-| 生成 API Key | 免费版最多 3 个 |
+| 控制台 | 四个视图：概览 / API 密钥 / 我的配额 / 用量统计 |
+| 控制台「我的配额」 | 显示三档额度，当前档位有标记，**无价格** |
+| 生成 API Key | 默认档最多 3 个 |
 | 用 Key 调 `/api/v1/quote?codes=600519.SH` | 返回行情 |
-| 充值下单 | **只剩「线下转账」**，没有"立即支付"按钮 |
-| 后台 `/admin.html` | 能看到用户/密钥/日志，缓存状态应为**已连接**（容器内 redis） |
-| 后台改用户级别、指派套餐 | 生效 |
+| 后台 `/admin.html` | 用户 / 密钥 / 日志 / 档位管理；缓存状态应为**已连接** |
+| 后台用户行 | 只有「档位」下拉，**没有余额、有效期按钮** |
+| 后台改用户档位 | 立即生效 |
 
 ---
 
-## 三·五、改完代码怎么上线（最容易踩的一坑）
+## 三、改完代码怎么上线（最容易踩的一坑）
 
 **`backend/` 是 `COPY` 进镜像的，没有 bind mount。**
 
@@ -147,7 +146,7 @@ python -u tools/acceptance.py      # 17 项自动验收
 ```bash
 python tools/upload.py      # 传代码到 /volume1/docker/stockdata
 python tools/deploy.py 2    # 重建 api/collector 镜像并重启 + 重启 nginx
-python tools/healthcheck.py # 46 项体检
+python tools/healthcheck.py # 接口体检
 ```
 
 `deploy.py 2` 里**必须重启 nginx**：nginx 会缓存 upstream 的 DNS 解析，
@@ -156,28 +155,25 @@ api 容器 recreate 后 IP 变了它还指着旧 IP → 全站 502，
 
 ---
 
-## 四、已知待办（不影响上线）
+## 四、已知待办 / 注意事项
 
-1. **支付商户参数** —— 网关、验签、回调、对账**全部已实现**，只差商户参数。
-   拿到资质后填 `docker-compose.yaml` 里 `WXPAY_*` / `ALIPAY_*` 和
-   `SITE_BASE_URL`，重启 api 即可，前端会自动出现扫码入口（详见第七节）。
-   退款接口尚未实现。
-2. **多 worker 缓存不共享** —— Dockerfile 用 `--workers 2`，
-   `plans.py` 的套餐/用量缓存是进程内的，两个 worker 各算一份，
+1. **多 worker 缓存不共享** —— Dockerfile 用 `--workers 2`，
+   `plans.py` 的档位/用量缓存是进程内的，两个 worker 各算一份，
    30 秒 TTL 内会漏算另一个 worker 的调用量（**配额偏松，不会误伤**）。
    要精确得把缓存挪到 Redis。
    同理，后台「数据源监控」的 ok/fail 计数是**进程内**的，
    看到某源 `ok=0 fail=0` 只说明**这个 worker 本轮没调到它**，不等于故障。
-3. **PG 就绪竞态** —— `api` 只等 `postgres` 启动、不等它 ready，
+2. **PG 就绪竞态** —— `api` 只等 `postgres` 启动、不等它 ready，
    极端情况下首批请求会 500，`restart: unless-stopped` 会自愈。
-4. 部署后建议**再改一次 `POSTGRES_PASSWORD`**（现在是 `stockdata_2026`），
-   同步改 `docker-compose.yaml` 里两处 `DATABASE_URL`。
-5. **东财被限流时的表现** —— 详见下节。它排在快照链最后一位，
+3. **东财被限流时的表现** —— 详见下节。它排在快照链最后一位，
    触发限流时会自动下沉，不影响取数，只是后台会显示该源 fail 增加。
+4. **密钥轮换** —— `JWT_SECRET` 与 `HITHINK_API_KEY` 曾经明文写在
+   `docker-compose.yaml` 里（那个版本已进入 git 历史）。现在已改为
+   环境变量占位，但**历史值仍建议轮换一次**。
 
 ---
 
-## 四·五、东方财富的限流（排查结论，别再踩一遍）
+## 五、东方财富的限流（排查结论，别再踩一遍）
 
 **症状**：`RemoteProtocolError: Server disconnected without sending a response.`
 ——注意它**不返回 429**，而是在 TCP 层直接掐断连接，靠状态码完全判断不出来。
@@ -212,52 +208,20 @@ api 容器 recreate 后 IP 变了它还指着旧 IP → 全站 502，
 
 ---
 
-## 六、新用户试用期（15 天）
-
-注册即送 **15 天专业版**体验，到期后自动停止调用数据接口（HTTP 402），
-购买套餐后恢复。管理员账号**豁免**拦截（否则哪天自己账号过期，连后台都进不去）。
-
-可调参数在 `docker-compose.yaml` 的 api 环境里：
-
-| 变量 | 默认 | 说明 |
-|---|---|---|
-| `TRIAL_ENABLED` | true | 关掉则新用户直接是免费版 |
-| `TRIAL_DAYS` | 15 | 试用天数 |
-| `TRIAL_PLAN` | pro | 试用期间享受哪个套餐的配额 |
-| `TRIAL_EXPIRE_BLOCK` | true | false = 到期只提示、不拦截 |
-
-到期判断统一走 `plans.entitlement()`（唯一真源），前后台和鉴权链路读同一份，
-不会出现"控制台显示还有 3 天、API 却已经 402"。
-
-后台「用户管理」每行都标了**试用/付费 · 剩 N 天**，并有「有效期」按钮可手动顺延
-（线下转账收款后在这里加天数）。
-
-## 七、接入支付要做什么
-
-代码已全部就位（`app/paygate/` + `routers/pay.py`），只差商户参数：
-
-1. 微信商户平台拿：`mchid`、证书序列号、APIv3 密钥、商户私钥、微信支付公钥
-2. 支付宝开放平台拿：`AppID`、应用私钥、支付宝公钥（应用公钥上传后换回）
-3. 填进 `docker-compose.yaml` 的 `WXPAY_*` / `ALIPAY_*`，以及 `SITE_BASE_URL`
-4. `python tools/deploy.py 2` 重启
-
-**回调地址**（填到商户平台）：
-
-```
-https://<你的域名>/api/v1/pay/notify/wechat
-https://<你的域名>/api/v1/pay/notify/alipay
-```
-
-未配置时前端只显示「线下转账」，不会出现点了必然报错的按钮。
-
-安全上已经做掉的：验签（先验签再解密）、金额核对（对不上不入账）、
-幂等（重复回调只入账一次）、应答格式区分（微信 JSON / 支付宝纯文本，
-回错渠道会无限重发）。
-
-## 八、回滚
+## 六、回滚
 
 ```bash
 cd /volume1/docker/stockdata
 sudo docker compose down          # 停容器，数据卷保留
 sudo docker compose down -v       # 连数据一起清（慎用）
 ```
+
+---
+
+## 七、给别人部署时要注意
+
+- 仓库里的 `docker-compose.yaml` 带了一批**作者自用环境的默认值**
+  （内网 `10.31.0.x` 的两个自建数据源地址）。换机器请通过 `.env` 覆盖。
+- `docs/hithink-llms-full.txt`（同花顺官方文档全文）已排除在仓库外，
+  需要时从 <https://fuyao.aicubes.cn/llms.txt> 自行获取。
+- 对外提供服务前请自行确认上游数据条款与所在地合规要求 —— 详见 `NOTICE`。

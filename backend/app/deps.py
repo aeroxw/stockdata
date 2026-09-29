@@ -13,7 +13,7 @@ from app.auth import decode_token, hash_api_key
 from app.config import settings
 from app.db import get_db
 from app.models import ApiKey, User
-from app.plans import bump_usage, check_daily_quota, enforce_entitlement
+from app.plans import bump_usage, check_daily_quota
 from app.ratelimit import check_rate_limit, is_blacklisted
 
 bearer = HTTPBearer(auto_error=False)
@@ -72,19 +72,20 @@ def _extract_apikey(
 
 
 def enforce_daily_quota(db: Session, user: User | None) -> None:
-    """套餐日调用配额 + 有效期。-1 = 不限。
+    """档位日调用配额。-1 = 不限。
 
     与「每分钟限流」互补：限流管突发，配额管总量。
+
+    注意这里没有"有效期"检查 —— 开源版不卖套餐，也就不存在到期一说，
+    额度只跟管理员指派的档位有关。
     """
     if user is None:
         return
-    #: 先查有效期：试用到期 / 套餐过期直接 402，不必再算配额。
-    enforce_entitlement(user)
     ok, used, quota = check_daily_quota(db, user)
     if not ok:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            f"今日调用配额已用尽（{used}/{quota}），请升级套餐或明日再试",
+            f"今日调用配额已用尽（{used}/{quota}），请明日再试或联系管理员调整额度",
         )
     bump_usage(user.id)
 
@@ -123,7 +124,7 @@ def _load_apikey(request: Request, raw: str, db: Session) -> ApiKey:
     request.state.user_id = int(key.user_id)
     request.state.key_id = int(key.id)
 
-    # 套餐日配额（按用户维度，多个 Key 共享同一份配额）
+    # 档位日配额（按用户维度，多个 Key 共享同一份额度）
     enforce_daily_quota(db, db.scalar(select(User).where(User.id == key.user_id)))
 
     key.last_used = datetime.utcnow()

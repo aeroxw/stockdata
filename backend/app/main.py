@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.db import init_db
 from app.models import ApiLog
-from app.routers import admin, apikey, auth, billing, data, pay
+from app.routers import admin, apikey, auth, data, quota
 from app.db import SessionLocal
 
 logging.basicConfig(level=logging.INFO)
@@ -88,11 +88,8 @@ API = "/api/v1"
 app.include_router(auth.router, prefix=API)
 app.include_router(apikey.router, prefix=API)
 app.include_router(data.router)
-app.include_router(billing.router, prefix=API)
+app.include_router(quota.router, prefix=API)
 app.include_router(admin.router, prefix=API)
-#: 支付回调。注意前缀同样是 /api/v1 —— 回调地址要在商户平台配置成
-#: https://<SITE_BASE_URL>/api/v1/pay/notify/wechat
-app.include_router(pay.router, prefix=API)
 
 
 @app.get("/health")

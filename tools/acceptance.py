@@ -82,10 +82,10 @@ if not tok:
     print("\n登录失败，后续验收跳过")
     raise SystemExit(1)
 
-# 4. 套餐 / 配额
-st, js = req(f"{API}/billing/plans", tok=tok)
+# 4. 配额档位
+st, js = req(f"{API}/quota/plans", tok=tok)
 items = (js.get("data") or {}).get("items", [])
-ck("套餐列表 3 档", st == 200 and len(items) == 3, str([x["code"] for x in items]))
+ck("档位列表 3 档", st == 200 and len(items) == 3, str([x["code"] for x in items]))
 
 # 5. 建 API Key
 st, js = req(f"{API}/apikey", "POST", {"name": "nas-smoke", "scopes": ["quote"]}, tok=tok)
@@ -101,19 +101,14 @@ if ok_data:
     d0 = (js.get("data") or [{}])[0]
     print(f"         贵州茅台 现价 {d0.get('price')}")
 
-# 7. 安全闸门：充值只能线下转账
-st, js = req(f"{API}/billing/recharge", "POST",
-             {"amount": 10000, "channel": "mock"}, tok=tok)
-ck("模拟支付已关闭(403)", st == 403, f"{st} {js.get('detail')}")
+# 7. 安全闸门：计费端点已全部移除
+for path in ("/billing/me", "/billing/plans", "/billing/orders"):
+    st, js = req(f"{API}{path}", tok=tok)
+    ck(f"{path} 已移除(404)", st == 404, f"{st}")
 
-st, js = req(f"{API}/billing/recharge", "POST",
-             {"amount": 10000, "channel": "manual"}, tok=tok)
-no = (js.get("data") or {}).get("order_no")
-ck("线下转账建单可用", st == 200 and bool(no), f"{st} {no}")
-
-if no:
-    st, js = req(f"{API}/billing/orders/{no}/pay", "POST", {}, tok=tok)
-    ck("线下转账单不能自助入账(400)", st == 400, f"{st} {js.get('detail')}")
+st, js = req(f"{API}/quota/me", tok=tok)
+q = (js.get("data") or {}).get("quota") or {}
+ck("我的配额可读", st == 200 and "max_keys" in q, f"{st} {q}")
 
 # 8. 后台概览（缓存状态）
 st, js = req(f"{API}/admin/stats", tok=tok)

@@ -22,7 +22,7 @@
       <a href="#architecture">架构</a>
       <a href="#features">核心能力</a>
       <a href="#playground">在线调试</a>
-      <a href="#pricing">套餐</a>
+      <a href="#opensource">开源</a>
       <a href="/docs.html">开发文档</a>
     </div>
     <div class="nav-actions" id="navActions">
@@ -52,7 +52,7 @@
 
     <div class="hero-cta">
       <a class="btn btn-primary" href="/login.html?tab=register">免费获取 API Key →</a>
-      <a class="btn btn-ghost" href="#playground">先试一下真实接口</a>
+      <a class="btn btn-ghost" href="#opensource">自己部署一份</a>
     </div>
 
     <!-- 平台指标 -->
@@ -613,7 +613,7 @@ curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/kline?code=600519.
           <tr>
             <td>密钥与配额</td>
             <td><span class="compare-no">无</span></td>
-            <td><span class="compare-yes">控制台自助</span>创建/轮换/吊销，按套餐配额</td>
+            <td><span class="compare-yes">控制台自助</span>创建/轮换/吊销，按档位配额</td>
           </tr>
           <tr>
             <td>特色数据</td>
@@ -626,57 +626,70 @@ curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/kline?code=600519.
   </div>
 </section>
 
-<!-- ===================== 套餐 ===================== -->
-<section class="section section-alt" id="pricing">
+<!-- ===================== 开源 ===================== -->
+<section class="section section-alt" id="opensource">
   <div class="container">
     <div class="section-head">
-      <div class="section-tag">Pricing</div>
-      <h2 class="section-title">按需选择，随时升级</h2>
-      <p class="section-desc">从个人研究到团队生产，都有合适的配额。</p>
+      <div class="section-tag">Open Source · Apache-2.0</div>
+      <h2 class="section-title">代码完全开源，不卖任何套餐</h2>
+      <p class="section-desc">
+        整个平台以 Apache-2.0 协议开源。你既可以直接用这个实例，也可以把代码拉到自己的机器上跑 ——
+        数据不经任何中间方，配额由你自己定。
+      </p>
     </div>
 
     <div class="price-grid">
       <div class="price-card">
-        <div class="price-name">Free</div>
-        <div class="price-val">¥0 <small>/ 月</small></div>
-        <div class="price-note">个人学习与策略验证</div>
+        <div class="price-name">直接用</div>
+        <div class="price-val">免费 <small>无期限</small></div>
+        <div class="price-note">适合先摸清接口能力</div>
         <ul class="price-list">
-          <li>60 次 / 分钟</li>
-          <li>3 个 API Key</li>
+          <li>注册即得 API Key</li>
+          <li>默认档 60 次 / 分钟 · 3 个 Key</li>
           <li>行情快照 + 日 K 线</li>
-          <li>社区支持</li>
+          <li>额度不够可让管理员调档</li>
         </ul>
-        <a class="btn btn-ghost" href="/login.html?tab=register">免费开始</a>
+        <a class="btn btn-ghost" href="/login.html?tab=register">注册使用</a>
       </div>
 
       <div class="price-card featured">
-        <div class="price-badge">最受欢迎</div>
-        <div class="price-name">Pro</div>
-        <div class="price-val">¥199 <small>/ 月</small></div>
-        <div class="price-note">量化研究者与小型团队</div>
+        <div class="price-badge">推荐</div>
+        <div class="price-name">自己部署</div>
+        <div class="price-val">0 元 <small>永久</small></div>
+        <div class="price-note">数据只在你的网络里流转</div>
         <ul class="price-list">
-          <li>600 次 / 分钟</li>
-          <li>10 个 API Key</li>
-          <li>全部特色数据（涨停池/龙虎榜）</li>
-          <li>财报 + 估值数据</li>
-          <li>多源交叉校验</li>
+          <li>一份 docker-compose.yaml 起全套</li>
+          <li>配额档位完全自己说了算</li>
+          <li>数据源凭据留在本地，不外传</li>
+          <li>可按需改适配器、加数据源</li>
         </ul>
-        <a class="btn btn-primary" href="/login.html?tab=register">立即升级</a>
+        <a class="btn btn-primary" href="https://github.com/aeroxw/stockdata" target="_blank" rel="noopener">获取源码 →</a>
       </div>
 
       <div class="price-card">
-        <div class="price-name">VIP</div>
-        <div class="price-val">定制 <small>/ 年</small></div>
-        <div class="price-note">机构级生产环境</div>
+        <div class="price-name">一起改</div>
+        <div class="price-val">PR <small>欢迎</small></div>
+        <div class="price-note">缺数据源 / 缺字段就自己加</div>
         <ul class="price-list">
-          <li>不限频次（协商）</li>
-          <li>50 个 API Key</li>
-          <li>专属数据源通道</li>
-          <li>WebSocket 实时推送</li>
-          <li>1v1 技术支持</li>
+          <li>适配器接口统一，接新源成本低</li>
+          <li>修 bug、补文档、提 issue 都算贡献</li>
+          <li>Apache-2.0：可商用、可修改、可分发</li>
+          <li>保留版权声明即可，无 copyleft 传染</li>
         </ul>
-        <a class="btn btn-ghost" href="/login.html?tab=register">联系我们</a>
+        <a class="btn btn-ghost" href="https://github.com/aeroxw/stockdata" target="_blank" rel="noopener">参与贡献</a>
       </div>
+    </div>
+
+    <div class="code-block" style="margin-top:26px">
+      <div class="code-head">
+        <span class="code-dot" style="background:#ff5f56"></span>
+        <span class="code-dot" style="background:#ffbd2e"></span>
+        <span class="code-dot" style="background:#27c93f"></span>
+        <span class="code-lang">自建部署</span>
+      </div>
+      <div class="code-body">git clone https://github.com/aeroxw/stockdata.git &amp;&amp; cd stockdata
+cp .env.example .env          # 至少改 POSTGRES_PASSWORD 与 JWT_SECRET
+docker compose up -d --build  # API + PostgreSQL + Redis + Nginx 一次起来</div>
     </div>
   </div>
 </section>
@@ -687,8 +700,10 @@ curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/kline?code=600519.
     <div class="alert alert-info" style="margin:0">
       <span>⚠️</span>
       <div>
-        <strong>数据用途声明：</strong>本站数据均来自公开渠道，仅用于技术研究、策略回测与学习用途。
-        请勿用于任何商业转售或未经授权的分发；行情数据存在延迟与误差可能，不构成任何投资建议。
+        <strong>关于数据与授权：</strong>本站代码以 Apache-2.0 开源，但<b>六家上游数据源的数据不属于本项目</b>，
+        其使用受各自服务条款约束。自部署时数据只在你的网络内流转，请你自行确认符合上游条款与当地法规；
+        公开实例仅用于接口能力演示与学习研究。<br>
+        行情数据存在延迟与误差可能，<b>不构成任何投资建议</b>。
       </div>
     </div>
   </div>
@@ -704,7 +719,8 @@ curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/kline?code=600519.
           <div>StockData</div>
         </div>
         <p style="color:var(--muted);font-size:14px;max-width:320px">
-          聚合六大金融数据源，提供统一、可靠、可观测的 A 股数据 API 服务。
+          聚合六大金融数据源，提供统一、可靠、可观测的 A 股数据 API。
+          代码以 Apache-2.0 开源，可自由自建与二次开发。
         </p>
       </div>
       <div>
@@ -713,7 +729,7 @@ curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/kline?code=600519.
           <li><a href="#market">市场概览</a></li>
           <li><a href="#sources">数据源</a></li>
           <li><a href="#api">接口示例</a></li>
-          <li><a href="#pricing">套餐定价</a></li>
+          <li><a href="#opensource">开源与自建</a></li>
         </ul>
       </div>
       <div>
@@ -728,10 +744,10 @@ curl <span class="s">"http://&lt;你的域名&gt;:9850/api/v1/kline?code=600519.
       <div>
         <div class="footer-title">关于</div>
         <ul class="footer-links">
-          <li><a href="#">服务条款</a></li>
-          <li><a href="#">数据合规声明</a></li>
-          <li><a href="#">隐私政策</a></li>
-          <li><a href="#">联系我们</a></li>
+          <li><a href="https://github.com/aeroxw/stockdata" target="_blank" rel="noopener">源码仓库</a></li>
+          <li><a href="https://github.com/aeroxw/stockdata/blob/main/LICENSE" target="_blank" rel="noopener">Apache-2.0 协议</a></li>
+          <li><a href="https://github.com/aeroxw/stockdata/issues" target="_blank" rel="noopener">提交 Issue</a></li>
+          <li><a href="#opensource">自建部署</a></li>
         </ul>
       </div>
     </div>

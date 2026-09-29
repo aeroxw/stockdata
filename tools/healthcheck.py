@@ -210,67 +210,46 @@ if kid:
     ck("物理删除已吊销 Key", st == 200, f"{st}")
 
 # ---------------------------------------------------------------- 8. 计费
-sect("8. 套餐 / 充值 / 账单")
-st, js = req("/billing/plans", tok=TOK)
+sect("8. 配额与用量")
+st, js = req("/quota/plans", tok=TOK)
 plans = (js.get("data") or {}).get("items") or []
-ck("套餐列表", st == 200 and len(plans) >= 3, f"{st} {[p['code'] for p in plans]}")
-st, js = req("/billing/me", tok=TOK)
-b = js.get("data") or {}
-ck("我的套餐与余额", st == 200,
-   f"tier={b.get('plan', {}).get('code')} 余额={b.get('balance')}分")
-#: 到期信息必须完整返回 —— 这是控制台展示的唯一数据源，
-#: 少了 entitlement 前端就显示不出到期时间
-ck("返回权益/到期信息", "entitlement" in b and "is_trial" in b,
-   f"trial={b.get('is_trial')} 剩{b.get('days_left')}天 过期={b.get('expired')}")
+ck("档位列表", st == 200 and len(plans) >= 3, f"{st} {[p['code'] for p in plans]}")
+#: 档位里**不能再出现价格字段**，出现就说明开源化改造没做干净
+ck("档位不含价格字段",
+   all(("price_month" not in p and "price_year" not in p) for p in plans),
+   str([k for p in plans for k in p if k.startswith("price_")]))
 
-st, js = req("/billing/channels", tok=TOK)
-ch = (js.get("data") or {}).get("items") or []
-ck("支付渠道列表", st == 200 and len(ch) >= 1,
-   f"{st} {[c['channel'] for c in ch]} 在线已配={ (js.get('data') or {}).get('online_ready') }")
-st, js = req("/billing/usage?days=7", tok=TOK)
+st, js = req("/quota/me", tok=TOK)
+b = js.get("data") or {}
+ck("我的配额", st == 200,
+   f"tier={b.get('tier')} max_keys={(b.get('quota') or {}).get('max_keys')} "
+   f"日配额={(b.get('quota') or {}).get('daily_quota')}")
+#: 三项额度是限流链路的唯一真源，控制台与实际拦截必须读同一份
+ck("返回三项额度", {"max_keys", "rate_limit", "daily_quota"} <= set(b.get("quota") or {}),
+   str(sorted((b.get("quota") or {}).keys())))
+ck("返回已用情况", "calls_24h" in (b.get("usage") or {}),
+   str(sorted((b.get("usage") or {}).keys())))
+
+st, js = req("/quota/usage?days=7", tok=TOK)
 u = js.get("data") or {}
 ck("用量统计（控制台图表数据源）", st == 200 and bool(u.get("daily")),
    f"{st} {len(u.get('daily') or [])}天")
-st, js = req("/billing/orders", tok=TOK)
-ck("我的订单", st == 200, f"{st} total={(js.get('data') or {}).get('total')}")
-st, js = req("/billing/bills", tok=TOK)
-ck("我的账单", st == 200, f"{st}")
 
-#: 后台用户列表要带试用/剩余天数标记，管理员才能判断该不该催续费
+#: 后台用户列表要带档位与 Key 用量，管理员才能判断该不该调额度
 st, js = req("/admin/users?limit=5", tok=TOK)
 rows = (js.get("data") or {}).get("items") or []
-has_exp = any(("days_left" in r or r.get("is_trial") is not None) for r in rows)
-ck("后台用户列表含有效期字段", st == 200 and bool(rows) and has_exp,
-   f"{st} {len(rows)}个")
+ck("后台用户列表可用", st == 200 and bool(rows), f"{st} {len(rows)}个")
+ck("后台用户行不含余额/有效期字段",
+   bool(rows) and all(("balance" not in r and "plan_expires_at" not in r) for r in rows),
+   str([k for r in rows for k in r if k in ("balance", "plan_expires_at", "is_trial")]))
 
-#: 后台改有效期接口。
-#: **这条会真改数据**，所以必须"读原值 -> 改 -> 还原"，否则体检跑一次
-#: 就把航哥自己的账号从"长期有效"变成"1 天后到期"，纯属自己挖坑。
-if rows:
-    uid = rows[0].get("id")
-    orig_exp = rows[0].get("plan_expires_at")
-    st2, js2 = req(f"/admin/users/{uid}/expiry", "POST", {"days": 1}, tok=TOK)
-    ck("后台可调整用户有效期", st2 == 200,
-       f"{st2} {(js2.get('data') or {}).get('plan_expires_at')}")
-    restore = {"clear": True} if not orig_exp else {"expires_at": orig_exp}
-    st3, _ = req(f"/admin/users/{uid}/expiry", "POST", restore, tok=TOK)
-    ck("有效期已还原（体检不留副作用）", st3 == 200, f"{st3} 原值={orig_exp}")
-
-sect("9. 支付闸门（安全）")
-#: 期望值**按环境不同**：本地 .env 里 ALLOW_MOCK_PAY=true（跑测试必须开），
-#: NAS 上是 false（防白嫖）。同一个断言不能两边都用 403，否则本地必然假失败。
-IS_LOCAL = "--local" in sys.argv
-st, js = req("/billing/recharge", "POST", {"amount": 10000, "channel": "mock"}, tok=TOK)
-if IS_LOCAL:
-    ck("模拟支付在本地可用(true)", st == 200, f"{st}")
-else:
-    ck("模拟支付已关闭(403)", st == 403, f"{st}")
-st, js = req("/billing/recharge", "POST", {"amount": 10000, "channel": "manual"}, tok=TOK)
-no = (js.get("data") or {}).get("order_no")
-ck("线下转账可下单", st == 200 and bool(no), f"{st} {no}")
-if no:
-    st, js = req(f"/billing/orders/{no}/pay", "POST", {}, tok=TOK)
-    ck("线下转账单不可自助入账(400)", st == 400, f"{st}")
+sect("9. 支付已彻底移除（安全）")
+#: 开源版不该再有任何计费端点。这里逐个确认它们已经 404，
+#: 否则说明有残留路由被挂上去了。
+for path in ("/billing/me", "/billing/plans", "/billing/orders", "/billing/bills",
+             "/billing/channels"):
+    st, _ = req(path, tok=TOK)
+    ck(f"{path} 已移除(404)", st == 404, f"{st}")
 
 # ---------------------------------------------------------------- 10. 后台
 sect("10. 管理后台")
@@ -288,12 +267,10 @@ st, js = req("/admin/users?limit=5", tok=TOK)
 ck("用户列表", st == 200, f"{st} total={(js.get('data') or {}).get('total')}")
 st, js = req("/admin/keys?limit=5", tok=TOK)
 ck("密钥列表", st == 200, f"{st}")
-st, js = req("/admin/orders?limit=5", tok=TOK)
-ck("订单列表", st == 200, f"{st} total={(js.get('data') or {}).get('total')}")
 st, js = req("/admin/logs?limit=5", tok=TOK)
 ck("调用日志", st == 200, f"{st} total={(js.get('data') or {}).get('total')}")
 st, js = req("/admin/plans", tok=TOK)
-ck("套餐管理", st == 200, f"{st} {len((js.get('data') or {}).get('items') or [])}个")
+ck("档位管理", st == 200, f"{st} {len((js.get('data') or {}).get('items') or [])}个")
 
 # ---------------------------------------------------------------- 11. 数据源健康
 sect("11. 数据源健康汇总")

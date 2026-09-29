@@ -82,20 +82,20 @@ def preclean():
     from sqlalchemy import select
 
     from app.db import SessionLocal
-    from app.models import ApiKey, ApiLog, BalanceLog, Order, User
+    from app.models import ApiKey, ApiLog, User
 
     s = SessionLocal()
     try:
         n = 0
         for u in s.scalars(select(User)).all():
             if (u.email or "").startswith("adm") and (u.email or "").endswith("@stockdata.dev"):
-                #: 四张关联表都要删。以前只删了 Order / BalanceLog，
+                #: 两张关联表都要删。以前只删了 User，
                 #: 漏掉 ApiKey / ApiLog —— SQLite 的 INTEGER PRIMARY KEY 会复用
                 #: 已删用户的 id，下一轮新建的 adm 用户"继承"了上一轮的密钥：
                 #:   [8]  active_keys 变成 2（期望 1）
                 #:   [20] 按邮箱搜密钥返回 2 条（期望 1）
                 #: 只删用户不删关联表，是所有"计数莫名多 1"类假失败的共同根因。
-                for M in (ApiKey, Order, BalanceLog, ApiLog):
+                for M in (ApiKey, ApiLog):
                     s.query(M).filter(M.user_id == u.id).delete(synchronize_session=False)
                 s.delete(u)
                 n += 1

@@ -26,30 +26,16 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    #: 套餐代码，对应 plans.code（free / pro / vip / 后台自定义套餐）
+    #: 配额档位代码，对应 plans.code（free / pro / vip / 后台自定义档位）
+    #:
+    #: 注意：tier **不是商品**，只是运营用的配额档位。项目开源后不售卖任何套餐，
+    #: 它唯一的作用是决定这个用户能建几个 Key、每分钟限流多少、每天能调多少次。
     tier: Mapped[str] = mapped_column(String(32), default="free", nullable=False)
     #: 管理员后台权限
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    #: 账户余额。**单位「分」**（整数存储，杜绝浮点误差）
-    balance: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    #: 当前套餐到期时间；NULL = 长期有效（免费版或永久授权）
-    #:
-    #: 试用期内这个字段同样有效 —— 新用户注册即拿到 15 天体验期，
-    #: 到期时间就记在这里，和付费套餐共用一套判断逻辑，不用两处判断。
-    plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    #: 是否处于**新用户试用期**。
-    #:
-    #: 单独存一列（而不是靠 tier 猜）的原因：试用套餐和付费套餐可能是同一个
-    #: code（比如试用给 pro、买的也是 pro），只看 tier 分不清"体验中"还是"已付费"，
-    #: 而两者的到期策略不同 —— 试用到期直接停 API，付费到期才走续费提醒。
-    is_trial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    @property
-    def balance_yuan(self) -> float:
-        return round((self.balance or 0) / 100.0, 2)
 
 
 class ApiKey(Base):
@@ -150,30 +136,27 @@ class StockMeta(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
-# ---------------------------------------------------------------- 计费
+# ---------------------------------------------------------------- 配额
 class Plan(Base):
-    """套餐。后台可自由增删改（"定制套餐版本"），用户的 tier 即 plans.code。
+    """配额档位。后台可自由增删改，用户的 tier 即 plans.code。
 
     设计要点：
-      * 价格一律存**分**（Integer），展示时再除以 100，避免 0.1+0.2 那种经典误差；
-      * level 决定升级/降级方向，不靠 code 字符串比较；
+      * 开源版本**不卖任何东西**，所以这里没有价格字段 —— 它只是一组
+        「能建几个 Key / 每分钟限流多少 / 每天能调多少次」的额度配置；
+      * level 决定档位高低，不靠 code 字符串比较；
       * max_keys / rate_limit / daily_quota 三档配额**从这张表读**，
-        不再散落在代码里硬编码（否则后台改了套餐却不生效）。
-      * is_public=false 可做"隐藏套餐"，只由后台手动指派给指定用户。
+        不再散落在代码里硬编码（否则后台改了档位却不生效）；
+      * is_public=false 可做"隐藏档位"，只由后台手动指派给指定用户。
     """
 
     __tablename__ = "plans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    #: 套餐代码，与 users.tier 一一对应
+    #: 档位代码，与 users.tier 一一对应
     code: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
-    #: 层级：数字越大套餐越高，用于判断升级 / 降级
+    #: 层级：数字越大档位越高
     level: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
-    #: 月度价格（分）
-    price_month: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    #: 年度价格（分）；通常 = price_month * 10（买 10 送 2）
-    price_year: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     #: 可创建的活跃 API Key 上限
     max_keys: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
     #: 单 Key 每分钟限流
@@ -183,70 +166,15 @@ class Plan(Base):
     #: 卖点列表，前端直接渲染成勾选项
     features: Mapped[list] = mapped_column(JSON, default=list)
     description: Mapped[str] = mapped_column(Text, default="")
-    #: false = 隐藏套餐，不在用户端展示，仅后台指派
+    #: false = 隐藏档位，不在用户端展示，仅后台指派
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    #: 停用后不允许新购/升级，已购用户保留权益
+    #: 停用后不允许再指派给新用户
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-
-
-class Order(Base):
-    """订单：充值 / 套餐升级 / 续费。
-
-    kind:
-      recharge —— 纯充值，支付成功后金额进余额；
-      upgrade  —— 用余额购买套餐（不下单支付，直接扣余额，也记一笔订单便于对账）；
-      renew    —— 续费当前套餐。
-    """
-
-    __tablename__ = "orders"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    order_no: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
-    kind: Mapped[str] = mapped_column(String(16), default="recharge", nullable=False)
-    title: Mapped[str] = mapped_column(String(128), default="")
-    #: 金额（分）
-    amount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    #: upgrade / renew 时的目标套餐
-    plan_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    #: month / year
-    period: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    #: mock / manual / wechat / alipay
-    pay_channel: Mapped[str] = mapped_column(String(16), default="mock", nullable=False)
-    #: pending / paid / failed / cancelled / refunded
-    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False, index=True)
-    #: 支付渠道流水号
-    trade_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    remark: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
-    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-
-class BalanceLog(Base):
-    """余额流水（账单）。只读追加，不做物理删除，保证可审计。"""
-
-    __tablename__ = "balance_logs"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
-    #: 变动金额（分）：正 = 入账，负 = 出账
-    amount: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    #: 变动后的余额（分），便于逐笔核对
-    balance_after: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    #: recharge / consume / refund / grant / deduct
-    type: Mapped[str] = mapped_column(String(24), default="recharge", nullable=False, index=True)
-    #: 关联订单号
-    ref: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    remark: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
 
 class ApiLog(Base):

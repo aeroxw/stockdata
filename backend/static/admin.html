@@ -51,14 +51,10 @@
       </button>
     </div>
     <div class="side-block">
-      <div class="side-label">商业化</div>
+      <div class="side-label">配额</div>
       <button class="side-item" data-view="plans">
-        <span class="side-ico">◈</span>套餐管理
+        <span class="side-ico">◈</span>档位管理
         <span class="side-badge" id="planBadge">—</span>
-      </button>
-      <button class="side-item" data-view="orders">
-        <span class="side-ico">⌗</span>订单与账单
-        <span class="side-badge" id="orderBadge">—</span>
       </button>
     </div>
     <div class="side-foot">
@@ -147,7 +143,7 @@
 
       <div class="two-col">
         <div class="panel">
-          <div class="panel-head"><div class="panel-title">套餐分布</div></div>
+          <div class="panel-head"><div class="panel-title">档位分布</div></div>
           <div id="tierWrap"><div class="empty">加载中…</div></div>
         </div>
         <div class="panel">
@@ -177,9 +173,9 @@
         </div>
         <div class="toolbar">
           <input class="tb-input" id="uQ" placeholder="搜索邮箱或 ID…" oninput="debounce(loadUsers, 300)()">
-          <!-- 套餐选项由 /admin/plans 动态填充，见 renderTierFilter() -->
+          <!-- 档位选项由 /admin/plans 动态填充，见 renderTierFilter() -->
           <select class="tb-select" id="uTier" onchange="loadUsers()">
-            <option value="">全部套餐</option>
+            <option value="">全部档位</option>
           </select>
           <select class="tb-select" id="uStatus" onchange="loadUsers()">
             <option value="all">全部状态</option>
@@ -230,88 +226,30 @@
       </div>
     </section>
 
-    <!-- ---------- 套餐管理 ---------- -->
+    <!-- ---------- 档位管理 ---------- -->
     <section class="view hidden" id="view-plans">
       <div class="kpi-grid">
         <div class="kpi">
-          <div class="kpi-label">在售套餐</div>
+          <div class="kpi-label">配额档位</div>
           <div class="kpi-value" id="kpiPlans">—</div>
           <div class="kpi-sub" id="kpiPlansSub">—</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">累计充值</div>
-          <div class="kpi-value" id="kpiPaid">—</div>
-          <div class="kpi-sub" id="kpiPaidSub">—</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">待处理订单</div>
-          <div class="kpi-value" id="kpiPending">—</div>
-          <div class="kpi-sub">线下转账待确认</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">用户余额合计</div>
-          <div class="kpi-value" id="kpiBalance">—</div>
-          <div class="kpi-sub">平台应付负债口径</div>
         </div>
       </div>
 
       <div class="panel">
         <div class="panel-head">
-          <div class="panel-title">套餐版本</div>
-          <button class="btn btn-primary btn-sm" onclick="openPlanEditor()">+ 新建套餐</button>
+          <div class="panel-title">额度档位</div>
+          <button class="btn btn-primary btn-sm" onclick="openPlanEditor()">+ 新建档位</button>
         </div>
         <div class="panel-note" style="margin-bottom:12px">
-          改价格或配额后<b>立即生效</b>；已有用户保留原权益直到下次续费。
-          <code>is_public = 否</code> 的套餐不会出现在用户端，只能由后台手动指派。
+          改配额后<b>立即生效</b>：新密钥按新限流创建，日配额超限会即时拦截。
+          开源版<b>不售卖任何套餐</b>，这里配置的是额度，不是商品。
+          <code>is_public = 否</code> 的档位不会出现在用户端，只能由后台手动指派。
         </div>
         <div id="planWrap"><div class="empty">加载中…</div></div>
       </div>
     </section>
 
-    <!-- ---------- 订单与账单 ---------- -->
-    <section class="view hidden" id="view-orders">
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">订单</div>
-          <span class="panel-note">线下转账订单需管理员确认后才会入账</span>
-        </div>
-        <div class="toolbar">
-          <input class="tb-input" id="oQ" placeholder="搜索订单号 / 邮箱…" oninput="debounce(loadAdminOrders, 300)()">
-          <select class="tb-select" id="oKind" onchange="resetP('orders', loadAdminOrders)">
-            <option value="all">全部类型</option>
-            <option value="recharge">充值</option>
-            <option value="upgrade">升级</option>
-            <option value="renew">续费</option>
-            <option value="downgrade">变更</option>
-          </select>
-          <select class="tb-select" id="oStatus" onchange="resetP('orders', loadAdminOrders)">
-            <option value="all">全部状态</option>
-            <option value="pending">待支付</option>
-            <option value="paid">已支付</option>
-            <option value="cancelled">已取消</option>
-          </select>
-          <span class="tb-count" id="oCount">—</span>
-        </div>
-        <div class="table-scroll"><div id="orderWrap"><div class="empty">加载中…</div></div></div>
-        <div class="pager" id="oPager"></div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">余额流水</div>
-          <select class="tb-select" id="bType" onchange="resetP('bills', loadAdminBills)">
-            <option value="all">全部类型</option>
-            <option value="recharge">充值入账</option>
-            <option value="consume">套餐消费</option>
-            <option value="refund">退款</option>
-            <option value="grant">管理员赠送</option>
-            <option value="deduct">管理员扣减</option>
-          </select>
-        </div>
-        <div class="table-scroll"><div id="billWrap"><div class="empty">加载中…</div></div></div>
-        <div class="pager" id="bPager"></div>
-      </div>
-    </section>
   </main>
 </div>
 
@@ -334,19 +272,18 @@
    视图切换 + 各视图数据加载 + 操作
    ============================================================ */
 
-/* 套餐已改为后台可自定义，不能再在前端写死 free/pro/vip 三档。
+/* 档位已改为后台可自定义，不能再在前端写死 free/pro/vip 三档。
    state.plans 由 /admin/plans 填充；接口还没返回时先用内置三档兜底，
    避免下拉框空白或渲染报错。 */
 const FALLBACK_PLANS = [
-  { code: 'free', name: '免费版', level: 0, price_month: 0, price_year: 0, max_keys: 3, rate_limit: 60, daily_quota: 1000 },
-  { code: 'pro', name: '专业版', level: 10, price_month: 9900, price_year: 99000, max_keys: 10, rate_limit: 300, daily_quota: 50000 },
-  { code: 'vip', name: '旗舰版', level: 20, price_month: 29900, price_year: 299000, max_keys: 50, rate_limit: 1200, daily_quota: -1 },
+  { code: 'free', name: '默认档', level: 0, max_keys: 3, rate_limit: 60, daily_quota: 1000 },
+  { code: 'pro', name: '进阶档', level: 10, max_keys: 10, rate_limit: 300, daily_quota: 50000 },
+  { code: 'vip', name: '宽松档', level: 20, max_keys: 50, rate_limit: 1200, daily_quota: -1 },
 ];
 const SRC_LABEL = {
   hithink: '同花顺', tencent: '腾讯', sina: '新浪',
   eastmoney: '东方财富', tdx: '通达信', kaipanla: '开盘了',
 };
-const yuan = (cents) => ((cents || 0) / 100).toFixed(2);
 
 /* ---------- 基础工具 ---------- */
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g,
@@ -399,14 +336,12 @@ const state = {
   users: { offset: 0, limit: 20, total: 0 },
   keys: { offset: 0, limit: 20, total: 0 },
   logs: { offset: 0, limit: 30, total: 0 },
-  orders: { offset: 0, limit: 20, total: 0 },
-  bills: { offset: 0, limit: 20, total: 0 },
   stats: null,
   sources: [],
   plans: [],
 };
 
-/* ---------- 套餐工具（全部走 state.plans，读不到就用兜底值） ---------- */
+/* ---------- 档位工具（全部走 state.plans，读不到就用兜底值） ---------- */
 function planList() {
   return state.plans && state.plans.length ? state.plans : FALLBACK_PLANS;
 }
@@ -427,18 +362,14 @@ function tierOptions(selected) {
   ).join('');
 }
 
-/* 金额输入框（元）<-> 分 的小工具，避免每处都手写 /100 */
-function centsOf(v) { return Math.round(parseFloat(v || 0) * 100); }
-
 /* ---------- 视图切换 ---------- */
 const VIEWS = {
   overview: { title: '系统概览', sub: '平台整体运行状况与关键指标' },
   sources: { title: '数据源健康', sub: '六家数据源的实时可用性与响应表现' },
-  users: { title: '用户管理', sub: '注册账号、套餐等级与访问权限' },
+  users: { title: '用户管理', sub: '注册账号、配额档位与访问权限' },
   keys: { title: 'API 密钥', sub: '全平台密钥清单，可吊销与清理' },
   logs: { title: '调用日志', sub: '接口调用明细，用于排障与审计' },
-  plans: { title: '套餐管理', sub: '自定义套餐版本、价格与配额' },
-  orders: { title: '订单与账单', sub: '充值订单、套餐订单与余额流水' },
+  plans: { title: '档位管理', sub: '自定义额度档位：Key 数、限流与日配额' },
 };
 
 function switchView(v) {
@@ -456,7 +387,6 @@ function switchView(v) {
   if (v === 'keys') loadKeys();
   if (v === 'logs') loadLogs();
   if (v === 'plans') loadAdminPlans();
-  if (v === 'orders') { loadAdminOrders(); loadAdminBills(); }
 }
 
 document.querySelectorAll('.side-item').forEach((b) => {
@@ -497,7 +427,7 @@ async function loadStats() {
     renderTrend(d.hourly);
     renderTopPaths(d.top_paths);
     renderStatus(d.status_dist);
-    /* 后端同时给了 tier_counts（旧字段）和 tiers（含套餐中文名），
+    /* 后端同时给了 tier_counts（旧字段）和 tiers（含档位中文名），
        优先用 tiers；老版本后端没有该字段时回落到 tier_counts。 */
     renderTiers(
       d.tiers && d.tiers.length
@@ -506,14 +436,6 @@ async function loadStats() {
       d.users
     );
     renderSys(d.system, d.stock_meta);
-
-    const rev = d.revenue || {};
-    if (document.getElementById('kpiPaid')) {
-      document.getElementById('kpiPaid').textContent = '¥' + yuan(rev.paid_amount);
-      document.getElementById('kpiPaidSub').innerHTML = `已支付 <b>${nfmt(rev.paid_orders)}</b> 笔`;
-      document.getElementById('kpiPending').textContent = nfmt(rev.pending_orders);
-      document.getElementById('kpiBalance').textContent = '¥' + yuan(rev.balance_total);
-    }
 
     document.getElementById('userBadge').textContent = d.users;
     document.getElementById('keyBadge').textContent = d.active_keys;
@@ -620,13 +542,13 @@ function renderStatus(dist) {
 
 function renderTiers(tiers, total) {
   const wrap = document.getElementById('tierWrap');
-  /* 后端已按库里的套餐动态给出 tiers（含后台自定义套餐），
+  /* 后端已按库里的档位动态给出 tiers（含后台自定义档位），
      这里直接渲染，不再依赖前端写死的三档 */
   const rows = (tiers || []).map((t) => ({
     code: t.code, name: t.name, n: t.count || 0,
   }));
   if (!rows.length) {
-    wrap.innerHTML = '<div class="empty">暂无套餐数据</div>';
+    wrap.innerHTML = '<div class="empty">暂无档位数据</div>';
     return;
   }
   const max = Math.max(1, ...rows.map((r) => r.n));
@@ -759,14 +681,13 @@ function renderUsers(rows) {
   if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的用户</div>'; return; }
   wrap.innerHTML = `<table class="table-nowrap">
     <thead><tr>
-      <th>用户</th><th>套餐</th><th>角色</th><th>状态</th>
-      <th>Key 用量</th><th>余额</th><th>24h 调用</th><th>注册时间</th><th style="text-align:right">操作</th>
+      <th>用户</th><th>档位</th><th>角色</th><th>状态</th>
+      <th>Key 用量</th><th>24h 调用</th><th>注册时间</th><th style="text-align:right">操作</th>
     </tr></thead>
     <tbody>${rows.map((u) => {
       const quota = u.key_quota ?? planQuota(u.tier);
       const full = (u.active_keys || 0) >= quota;
       const me = ME && u.id === ME.id;
-      const bal = u.balance || 0;
       return `<tr${u.is_active ? '' : ' class="row-dim"'}>
         <td>
           <div class="cell-main" title="${esc(u.email)}">${esc(u.email)}</div>
@@ -776,41 +697,22 @@ function renderUsers(rows) {
           <select class="tier-select tier-${esc(u.tier)}" onchange="changeTier(${u.id}, this.value)">
             ${tierOptions(u.tier)}
           </select>
-          <div class="cell-sub">${expiryCell(u)}</div>
         </td>
         <td>${u.is_admin ? '<span class="status main">管理员</span>' : '<span class="cell-sub">普通用户</span>'}</td>
         <td>${u.is_active
           ? '<span class="status ok">正常</span>'
           : '<span class="status partial">已禁用</span>'}</td>
         <td class="mono ${full ? 'txt-warn' : ''}">${u.active_keys || 0} / ${quota}</td>
-        <td class="mono">¥${yuan(bal)}</td>
         <td class="mono">${nfmt(u.calls_24h)}</td>
         <td class="cell-sub">${SD.fmtTime(u.created_at)}</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="btn btn-ghost btn-sm" onclick="viewUser(${u.id})">详情</button>
-          <button class="btn btn-ghost btn-sm" onclick="openBalanceEditor(${u.id}, '${esc(u.email)}', ${bal})">余额</button>
-          <button class="btn btn-ghost btn-sm" onclick="openExpiryEditor(${u.id}, '${esc(u.email)}')">有效期</button>
           <button class="btn btn-ghost btn-sm" onclick="toggleUser(${u.id}, ${u.is_active})">${u.is_active ? '禁用' : '启用'}</button>
           <button class="btn btn-ghost btn-sm" onclick="resetPwd(${u.id}, '${esc(u.email)}')">改密码</button>
           ${me ? '' : `<button class="btn btn-danger btn-sm" onclick="delUser(${u.id}, '${esc(u.email)}')">删除</button>`}
         </td>
       </tr>`;
     }).join('')}</tbody></table>`;
-}
-
-/* 有效期单元格：后台必须能一眼看出"试用 / 付费 / 剩几天 / 已过期"，
-   否则管理员根本不知道该不该催用户续费。 */
-function expiryCell(u) {
-  if (!u.plan_expires_at) return '<span style="color:var(--muted)">长期有效</span>';
-  const d = String(u.plan_expires_at).slice(0, 10);
-  const tag = u.is_trial ? '试用' : '付费';
-  if (u.expired) {
-    return `<span class="status err">${tag} · 已过期</span>
-            <span style="color:var(--muted)"> ${d}</span>`;
-  }
-  const warn = u.days_left !== null && u.days_left <= 7;
-  return `<span class="${warn ? 'txt-warn' : ''}">${tag} · 剩 ${u.days_left} 天</span>
-          <span style="color:var(--muted)"> ${d}</span>`;
 }
 
 async function changeTier(id, tier) {
@@ -824,104 +726,6 @@ async function changeTier(id, tier) {
     toast('调整失败：' + e.message, 'err');
     loadUsers();   // 把下拉框回滚到真实值
   }
-}
-
-/* ---------- 调整有效期 ---------- */
-function openExpiryEditor(id, email) {
-  /* 注意：state.users 是**分页对象** {offset,limit,total}，不是用户数组。
-     用户行单独存一份在 state.userRows，别在这里 .find —— 会直接 TypeError。 */
-  const u = (state.userRows || []).find((x) => x.id === id) || {};
-  const cur = u.plan_expires_at
-    ? `${String(u.plan_expires_at).slice(0, 10)}${u.is_trial ? '（试用期）' : ''}`
-    : '长期有效';
-  openModal('调整有效期', `
-    <div class="kv-list" style="margin-bottom:16px">
-      <div class="kv"><span>用户</span><b>${esc(email)}</b></div>
-      <div class="kv"><span>当前有效期</span><b>${esc(cur)}</b></div>
-    </div>
-    <div class="field" style="margin-bottom:14px">
-      <label>顺延天数（在当前到期日基础上加，留空则用下方精确日期）</label>
-      <input id="expDays" type="number" step="1" placeholder="如 30" autocomplete="off">
-    </div>
-    <div class="field" style="margin-bottom:14px">
-      <label>或指定到期日期</label>
-      <input id="expDate" type="date" autocomplete="off">
-    </div>
-    <div class="chips" style="margin-bottom:18px">
-      <span class="chip" onclick="document.getElementById('expDays').value=15">+15 天</span>
-      <span class="chip" onclick="document.getElementById('expDays').value=30">+30 天</span>
-      <span class="chip" onclick="document.getElementById('expDays').value=365">+1 年</span>
-      <span class="chip" onclick="document.getElementById('expDays').value='';document.getElementById('expDate').value='';window.__expClear=true">设为长期有效</span>
-    </div>
-    <button class="btn btn-primary" style="width:100%" onclick="submitExpiry(${id})">确认调整</button>
-    <div class="panel-note" style="margin-top:10px">
-      顺延会在原到期日基础上累加，不会吞掉用户已买的天数；设为长期有效则不再限制。
-    </div>`);
-  window.__expClear = false;
-}
-
-async function submitExpiry(id) {
-  const daysRaw = document.getElementById('expDays').value;
-  const dateRaw = document.getElementById('expDate').value;
-  const body = {};
-  if (window.__expClear) {
-    body.clear = true;
-  } else if (dateRaw) {
-    body.expires_at = dateRaw + 'T23:59:59';
-  } else if (daysRaw !== '') {
-    body.days = parseInt(daysRaw, 10);
-  } else {
-    toast('请填写天数或选择日期', 'err'); return;
-  }
-  try {
-    const r = await SD.api(`/admin/users/${id}/expiry`, {
-      method: 'POST', body: JSON.stringify(body),
-    });
-    closeModal();
-    toast(r.msg || '已更新有效期');
-    loadUsers();
-  } catch (e) { toast('调整失败：' + e.message, 'err'); }
-}
-
-/* ---------- 调整余额 ---------- */
-function openBalanceEditor(id, email, balanceCents) {
-  openModal('调整余额', `
-    <div class="kv-list" style="margin-bottom:16px">
-      <div class="kv"><span>用户</span><b>${esc(email)}</b></div>
-      <div class="kv"><span>当前余额</span><b class="mono">¥${yuan(balanceCents)}</b></div>
-    </div>
-    <div class="field" style="margin-bottom:14px">
-      <label>变动金额（元，正数为赠送，负数为扣减）</label>
-      <input id="balAmt" type="number" step="0.01" placeholder="如 100 或 -50" autocomplete="off">
-    </div>
-    <div class="field" style="margin-bottom:18px">
-      <label>备注</label>
-      <input id="balRemark" placeholder="如：活动赠送 / 补偿" autocomplete="off">
-    </div>
-    <div class="chips" style="margin-bottom:18px">
-      <span class="chip" onclick="document.getElementById('balAmt').value=50">+50</span>
-      <span class="chip" onclick="document.getElementById('balAmt').value=100">+100</span>
-      <span class="chip" onclick="document.getElementById('balAmt').value=500">+500</span>
-      <span class="chip" onclick="document.getElementById('balAmt').value=-50">-50</span>
-    </div>
-    <button class="btn btn-primary" style="width:100%" onclick="submitBalance(${id})">确认调整</button>
-    <div class="panel-note" style="margin-top:10px">
-      扣减不允许把余额弄成负数；每一笔都会写进余额流水，可在「订单与账单」里查。
-    </div>`);
-}
-
-async function submitBalance(id) {
-  const cents = centsOf(document.getElementById('balAmt').value);
-  const remark = document.getElementById('balRemark').value.trim();
-  if (!cents) { toast('请输入变动金额', 'err'); return; }
-  try {
-    const r = await SD.api(`/admin/users/${id}/balance`, {
-      method: 'POST', body: JSON.stringify({ amount: cents, remark }),
-    });
-    closeModal();
-    toast(r.msg || '余额已调整');
-    loadUsers(); loadStats();
-  } catch (e) { toast('调整失败：' + e.message, 'err'); }
 }
 
 async function toggleUser(id, isActive) {
@@ -968,7 +772,7 @@ async function viewUser(id) {
       <div class="kv-list" style="margin-bottom:18px">
         <div class="kv"><span>邮箱</span><b>${esc(u.email)}</b></div>
         <div class="kv"><span>ID</span><b class="mono">#${u.id}</b></div>
-        <div class="kv"><span>套餐</span><b><span class="tier-pill tier-${u.tier}">${u.tier.toUpperCase()}</span></b></div>
+        <div class="kv"><span>档位</span><b><span class="tier-pill tier-${u.tier}">${u.tier.toUpperCase()}</span></b></div>
         <div class="kv"><span>角色</span><b>${u.is_admin ? '管理员' : '普通用户'}</b></div>
         <div class="kv"><span>状态</span><b>${u.is_active ? '正常' : '已禁用'}</b></div>
         <div class="kv"><span>注册时间</span><b>${SD.fmtTime(u.created_at)}</b></div>
@@ -1010,7 +814,7 @@ function openCreateUser() {
       <input id="nuPwd" type="text" placeholder="留空则随机生成" autocomplete="off">
     </div>
     <div class="field" style="margin-bottom:18px">
-      <label>套餐</label>
+      <label>配额档位</label>
       <select id="nuTier">${tierOptions('free')}</select>
     </div>
     <button class="btn btn-primary" onclick="submitCreateUser()" style="width:100%">创建</button>
@@ -1026,7 +830,7 @@ async function submitCreateUser() {
   if (!email) { toast('请填写邮箱', 'err'); return; }
   if (pwd.length < 8) { toast('密码至少 8 位', 'err'); return; }
   try {
-    // 注册接口固定给 free，创建成功后再按邮箱定位并改套餐
+    // 注册接口固定给 free，创建成功后再按邮箱定位并改档位
     await SD.api('/auth/register', {
       method: 'POST', body: JSON.stringify({ email, password: pwd }),
     });
@@ -1151,7 +955,7 @@ function renderLogs(rows) {
     </tr>`).join('')}</tbody></table>`;
 }
 
-/* ---------- 套餐管理 ---------- */
+/* ---------- 档位管理 ---------- */
 async function loadAdminPlans(reload) {
   try {
     const r = await SD.api('/admin/plans');
@@ -1163,41 +967,38 @@ async function loadAdminPlans(reload) {
     document.getElementById('kpiPlans').textContent = items.length;
     const pub = items.filter((p) => p.is_public && p.is_active).length;
     document.getElementById('kpiPlansSub').innerHTML =
-      `公开在售 <b>${pub}</b> · 隐藏 ${items.length - pub}`;
+      `公开 <b>${pub}</b> · 隐藏 ${items.length - pub}`;
     stamp();
   } catch (e) {
-    toast('套餐加载失败：' + e.message, 'err');
+    toast('档位加载失败：' + e.message, 'err');
     /* 接口挂了也要让下拉框可用，用内置三档兜底 */
     state.plans = [];
     renderTierFilter();
   }
 }
 
-/* 用户管理的套餐筛选下拉，选项跟着库里的套餐走 */
+/* 用户管理的档位筛选下拉，选项跟着库里的档位走 */
 function renderTierFilter() {
   const sel = document.getElementById('uTier');
   if (!sel) return;
   const cur = sel.value;
-  sel.innerHTML = '<option value="">全部套餐</option>' +
+  sel.innerHTML = '<option value="">全部档位</option>' +
     planList().map((p) => `<option value="${esc(p.code)}">${esc(p.name)}</option>`).join('');
   sel.value = cur;
 }
 
 function renderAdminPlans(rows) {
   const wrap = document.getElementById('planWrap');
-  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">还没有套餐</div>'; return; }
+  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">还没有档位</div>'; return; }
   wrap.innerHTML = `<div class="src-grid">${rows.map((p) => {
-    const isFree = p.price_month === 0 && p.price_year === 0;
     const state_ = p.is_active ? (p.is_public ? 'is-ok' : 'is-idle') : 'is-warn';
     return `<div class="src-card ${state_}">
       <div class="src-top">
         <div class="src-name">${esc(p.name)}</div>
-        <span class="status ${p.is_active ? 'ok' : 'partial'}">${p.is_active ? '在售' : '已停用'}</span>
+        <span class="status ${p.is_active ? 'ok' : 'partial'}">${p.is_active ? '启用中' : '已停用'}</span>
       </div>
       <div class="src-code mono">${esc(p.code)} · L${p.level}</div>
       <div class="src-metrics">
-        <div><span>月付</span><b class="mono">${isFree ? '免费' : '¥' + yuan(p.price_month)}</b></div>
-        <div><span>年付</span><b class="mono">${isFree ? '免费' : '¥' + yuan(p.price_year)}</b></div>
         <div><span>Key 上限</span><b class="mono">${p.max_keys}</b></div>
         <div><span>限流</span><b class="mono">${p.rate_limit}/min</b></div>
         <div><span>日配额</span><b class="mono">${p.daily_quota < 0 ? '不限' : nfmt(p.daily_quota)}</b></div>
@@ -1221,24 +1022,20 @@ function renderAdminPlans(rows) {
 function openPlanEditor(code) {
   const p = code ? planOf(code) : null;
   const v = p || {
-    code: '', name: '', level: 0, price_month: 0, price_year: 0,
+    code: '', name: '', level: 0,
     max_keys: 3, rate_limit: 60, daily_quota: 1000, description: '',
     features: [], is_public: true, is_active: true, sort_order: 99,
   };
-  openModal(p ? `编辑套餐 · ${p.name}` : '新建套餐', `
+  openModal(p ? `编辑档位 · ${p.name}` : '新建档位', `
     <div class="form-row">
-      <div class="field"><label>套餐代码（英文小写，等于 users.tier）</label>
+      <div class="field"><label>档位代码（英文小写，等于 users.tier）</label>
         <input id="plCode" value="${esc(v.code)}" placeholder="如 team" ${p ? 'disabled' : ''} autocomplete="off"></div>
-      <div class="field"><label>套餐名称</label>
-        <input id="plName" value="${esc(v.name)}" placeholder="如 团队版" autocomplete="off"></div>
-      <div class="field"><label>层级（越大越高，决定升级方向）</label>
+      <div class="field"><label>档位名称</label>
+        <input id="plName" value="${esc(v.name)}" placeholder="如 团队档" autocomplete="off"></div>
+      <div class="field"><label>层级（越大越高）</label>
         <input id="plLevel" type="number" value="${v.level}" autocomplete="off"></div>
     </div>
     <div class="form-row" style="margin-top:12px">
-      <div class="field"><label>月付价格（元）</label>
-        <input id="plMonth" type="number" step="0.01" value="${(v.price_month / 100).toFixed(2)}" autocomplete="off"></div>
-      <div class="field"><label>年付价格（元）</label>
-        <input id="plYear" type="number" step="0.01" value="${(v.price_year / 100).toFixed(2)}" autocomplete="off"></div>
       <div class="field"><label>排序</label>
         <input id="plSort" type="number" value="${v.sort_order}" autocomplete="off"></div>
     </div>
@@ -1250,7 +1047,7 @@ function openPlanEditor(code) {
       <div class="field"><label>日调用配额（-1 不限）</label>
         <input id="plQuota" type="number" value="${v.daily_quota}" autocomplete="off"></div>
     </div>
-    <div class="field" style="margin-top:12px"><label>卖点（每行一条）</label>
+    <div class="field" style="margin-top:12px"><label>额度说明（每行一条）</label>
       <textarea id="plFeats" rows="4" style="width:100%;background:var(--bg-soft);
         border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);
         font-family:inherit">${esc((v.features || []).join('\n'))}</textarea></div>
@@ -1261,13 +1058,13 @@ function openPlanEditor(code) {
         <input type="checkbox" id="plPublic" ${v.is_public ? 'checked' : ''}> 在用户端展示
       </label>
       <label style="display:flex;gap:7px;align-items:center">
-        <input type="checkbox" id="plActive" ${v.is_active ? 'checked' : ''}> 允许新购
+        <input type="checkbox" id="plActive" ${v.is_active ? 'checked' : ''}> 启用该档位
       </label>
     </div>
     <button class="btn btn-primary" style="width:100%;margin-top:18px"
       onclick="submitPlan(${p ? JSON.stringify(p.code) : 'null'})">保存</button>
     <div class="panel-note" style="margin-top:10px">
-      价格与配额保存后<b>立即生效</b>：新密钥按新限流创建，配额超限会即时拦截。
+      配额保存后<b>立即生效</b>：新密钥按新限流创建，日配额超限会即时拦截。
     </div>`);
 }
 
@@ -1275,8 +1072,6 @@ async function submitPlan(code) {
   const body = {
     name: document.getElementById('plName').value.trim(),
     level: parseInt(document.getElementById('plLevel').value) || 0,
-    price_month: centsOf(document.getElementById('plMonth').value),
-    price_year: centsOf(document.getElementById('plYear').value),
     max_keys: parseInt(document.getElementById('plKeys').value) || 3,
     rate_limit: parseInt(document.getElementById('plRate').value) || 60,
     daily_quota: parseInt(document.getElementById('plQuota').value),
@@ -1286,16 +1081,16 @@ async function submitPlan(code) {
     is_public: document.getElementById('plPublic').checked,
     is_active: document.getElementById('plActive').checked,
   };
-  if (!body.name) { toast('请填写套餐名称', 'err'); return; }
+  if (!body.name) { toast('请填写档位名称', 'err'); return; }
   if (isNaN(body.daily_quota)) { toast('日调用配额必须是数字（-1 表示不限）', 'err'); return; }
   try {
     if (code) {
       await SD.api(`/admin/plans/${code}`, { method: 'PUT', body: JSON.stringify(body) });
-      toast('套餐已更新，配额即时生效');
+      toast('档位已更新，配额即时生效');
     } else {
       body.code = document.getElementById('plCode').value.trim();
       await SD.api('/admin/plans', { method: 'POST', body: JSON.stringify(body) });
-      toast('套餐已创建');
+      toast('档位已创建');
     }
     closeModal();
     loadAdminPlans();
@@ -1309,129 +1104,28 @@ async function togglePlan(code, isActive) {
     await SD.api(`/admin/plans/${code}`, {
       method: 'PUT', body: JSON.stringify({ is_active: isActive }),
     });
-    toast(isActive ? '套餐已启用' : '套餐已停用（已购用户保留权益）');
+    toast(isActive ? '档位已启用' : '档位已停用（已指派用户会被回落）');
     loadAdminPlans();
   } catch (e) { toast('操作失败：' + e.message, 'err'); }
 }
 
 async function delPlan(code, users) {
   if (users) {
-    toast(`还有 ${users} 个用户在使用该套餐，请先把他们迁移到其他套餐`, 'err');
+    toast(`还有 ${users} 个用户在该档位，请先把他们迁移到其他档位`, 'err');
     return;
   }
-  if (!confirm(`确定删除套餐 ${code} 吗？该操作不可恢复。`)) return;
+  if (!confirm(`确定删除档位 ${code} 吗？该操作不可恢复。`)) return;
   try {
     await SD.api(`/admin/plans/${code}`, { method: 'DELETE' });
-    toast('套餐已删除');
+    toast('档位已删除');
     loadAdminPlans();
   } catch (e) { toast('删除失败：' + e.message, 'err'); }
-}
-
-/* ---------- 订单与账单 ---------- */
-async function loadAdminOrders() {
-  const s = state.orders;
-  const q = document.getElementById('oQ').value.trim();
-  const qs = new URLSearchParams({
-    offset: s.offset, limit: s.limit,
-    kind: document.getElementById('oKind').value,
-    status: document.getElementById('oStatus').value,
-    ...(q ? { q } : {}),
-  });
-  try {
-    const r = await SD.api('/admin/orders?' + qs.toString());
-    const d = r.data || {};
-    s.total = d.total || 0;
-    document.getElementById('oCount').innerHTML =
-      `共 ${s.total} 笔 · 已收 <b>¥${yuan(d.paid_amount)}</b>`;
-    document.getElementById('orderBadge').textContent = s.total;
-    renderAdminOrders(d.items || []);
-    renderPager('oPager', 'orders');
-    stamp();
-  } catch (e) { toast('订单加载失败：' + e.message, 'err'); }
-}
-
-function renderAdminOrders(rows) {
-  const wrap = document.getElementById('orderWrap');
-  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的订单</div>'; return; }
-  wrap.innerHTML = `<table>
-    <thead><tr><th>订单号</th><th>用户</th><th>类型</th><th>金额</th>
-      <th>渠道</th><th>状态</th><th>下单时间</th><th style="text-align:right">操作</th></tr></thead>
-    <tbody>${rows.map((o) => `<tr>
-      <td class="mono" style="font-size:12.5px">${esc(o.order_no)}</td>
-      <td class="cell-sub">${esc(o.user_email || o.user_id)}</td>
-      <td>${esc(o.kind_label || o.kind)}</td>
-      <td class="mono"><b>¥${esc(o.amount_yuan)}</b></td>
-      <td class="cell-sub">${o.pay_channel === 'mock' ? '模拟支付'
-          : o.pay_channel === 'manual' ? '线下转账'
-          : o.pay_channel === 'balance' ? '余额' : esc(o.pay_channel)}</td>
-      <td>${o.status === 'paid' ? '<span class="status ok">已支付</span>'
-          : o.status === 'pending' ? '<span class="status partial">待支付</span>'
-          : '<span class="cell-sub">' + esc(o.status_label || o.status) + '</span>'}</td>
-      <td class="cell-sub">${SD.fmtTime(o.created_at)}</td>
-      <td style="text-align:right;white-space:nowrap">
-        ${o.status === 'pending'
-          ? `<button class="btn btn-primary btn-sm" onclick="confirmOrder('${esc(o.order_no)}')">确认到账</button>
-             <button class="btn btn-ghost btn-sm" onclick="cancelAdminOrder('${esc(o.order_no)}')">取消</button>`
-          : o.paid_at ? `<span class="cell-sub">${SD.fmtTime(o.paid_at)}</span>` : ''}
-      </td>
-    </tr>`).join('')}</tbody></table>`;
-}
-
-async function confirmOrder(no) {
-  if (!confirm(`确认订单 ${no} 已收到款项？\n\n余额会立即增加，操作不可撤销。`)) return;
-  try {
-    const r = await SD.api(`/admin/orders/${no}/confirm`, { method: 'POST' });
-    toast(r.msg || '已确认到账');
-    loadAdminOrders(); loadStats();
-  } catch (e) { toast('确认失败：' + e.message, 'err'); }
-}
-
-async function cancelAdminOrder(no) {
-  if (!confirm(`确定取消订单 ${no} 吗？`)) return;
-  try {
-    await SD.api(`/admin/orders/${no}/cancel`, { method: 'POST' });
-    toast('订单已取消');
-    loadAdminOrders();
-  } catch (e) { toast('取消失败：' + e.message, 'err'); }
-}
-
-async function loadAdminBills() {
-  const s = state.bills;
-  const qs = new URLSearchParams({
-    offset: s.offset, limit: s.limit, type: document.getElementById('bType').value,
-  });
-  try {
-    const r = await SD.api('/admin/bills?' + qs.toString());
-    const d = r.data || {};
-    s.total = d.total || 0;
-    renderAdminBills(d.items || []);
-    renderPager('bPager', 'bills');
-  } catch (e) { toast('流水加载失败：' + e.message, 'err'); }
-}
-
-function renderAdminBills(rows) {
-  const wrap = document.getElementById('billWrap');
-  if (!rows || !rows.length) { wrap.innerHTML = '<div class="empty">没有匹配的流水</div>'; return; }
-  wrap.innerHTML = `<table>
-    <thead><tr><th>时间</th><th>用户 ID</th><th>类型</th><th>关联订单</th>
-      <th>变动</th><th>变动后余额</th><th>备注</th></tr></thead>
-    <tbody>${rows.map((b) => `<tr>
-      <td class="cell-sub">${SD.fmtTime(b.created_at)}</td>
-      <td class="mono">#${b.user_id}</td>
-      <td>${esc(b.type_label || b.type)}</td>
-      <td class="mono cell-sub">${esc(b.ref || '—')}</td>
-      <td class="${b.amount >= 0 ? 'txt-up' : 'txt-down'} mono">
-        ${b.amount >= 0 ? '+' : '-'}¥${esc(b.amount_yuan)}</td>
-      <td class="mono">¥${esc(b.balance_after_yuan)}</td>
-      <td class="cell-sub">${esc(b.remark || '')}</td>
-    </tr>`).join('')}</tbody></table>`;
 }
 
 /* ---------- 分页 ---------- */
 /* 用 state 的键名（而不是函数名）定位，避免压缩后函数名变化导致翻页失效 */
 const VIEW_STATE = {
   users: loadUsers, keys: loadKeys, logs: loadLogs,
-  orders: loadAdminOrders, bills: loadAdminBills,
 };
 
 /* 切换筛选条件时必须回到第一页，否则会出现"第 3 页但只有 2 条" */
@@ -1507,7 +1201,7 @@ document.getElementById('autoChk').onchange = setupAuto;
   } catch (e) {
     document.getElementById('adminMe').textContent = '未登录';
   }
-  /* 套餐要先拉好：用户管理的套餐下拉与筛选框都依赖它，
+  /* 档位要先拉好：用户管理的档位下拉与筛选框都依赖它，
      否则第一次进「用户管理」时下拉框是空的 */
   await loadAdminPlans();
   switchView('overview');
