@@ -4,8 +4,8 @@
 
 用法（Token 从环境变量读，绝不写进文件 / 不进命令行历史）:
 
-    set GITHUB_TOKEN=<TOKEN>     # Windows cmd
-    export GITHUB_TOKEN=<TOKEN>  # Linux / macOS
+    set GITHUB_TOKEN=<粘贴Token>     # Windows cmd
+    export GITHUB_TOKEN=<粘贴Token>  # Linux / macOS
     python -u tools/publish_github.py
 
 可选参数：
