@@ -52,9 +52,11 @@ a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; border: none; background: none; }
 input, select, textarea { font-family: inherit; }
 
-/* 内容区上限。首页 / 接口文档 / 用户控制台都用这一条（后台用 .admin-shell）。
-   改成 1640 后左右留白变窄，视口不足时仍由 92vw 兜底，不会溢出。 */
-.container { width: min(1640px, 92vw); margin: 0 auto; }
+/* 内容区上限。首页 / 接口文档 / 用户控制台都用这一条（后台用 .admin-shell，
+   后台表格列多，仍保持更宽的 1640，别顺手一起改）。
+   2026-09-29 从 1640 收到 1240 —— 前台三页内容本身不需要那么宽，
+   收窄后阅读行长更舒服。视口不足时仍由 92vw 兜底，不会溢出。 */
+.container { width: min(1240px, 92vw); margin: 0 auto; }
 
 /* ---------------- 导航 ---------------- */
 .nav {
@@ -68,7 +70,7 @@ input, select, textarea { font-family: inherit; }
 .nav.scrolled { background: rgba(8, 11, 20, 0.95); box-shadow: 0 4px 24px rgba(0,0,0,.4); }
 .nav-inner {
   /* 必须与 .container 同宽，否则导航条和正文内容对不齐 */
-  width: min(1640px, 92vw); margin: 0 auto; height: 100%;
+  width: min(1240px, 92vw); margin: 0 auto; height: 100%;
   display: flex; align-items: center; gap: 40px;
 }
 .logo { display: flex; align-items: center; gap: 11px; font-weight: 700; font-size: 18px; letter-spacing: -.3px; }
@@ -591,7 +593,8 @@ tbody tr:hover { background: rgba(61,125,255,.05); }
 .admin-shell {
   display: grid; grid-template-columns: 232px 1fr; gap: 0;
   padding-top: 66px; min-height: 100vh;
-  /* 后台内容比前台多（表格列宽大），上限与前台统一为 1640 保持一致观感 */
+  /* 后台表格列多（用户管理 / 密钥管理各 9 列），上限刻意比前台的 1240 宽，
+     维持 1640 才有横向余量。改前台宽度时不要顺手把这里也改小。 */
   width: min(1640px, 96vw); margin: 0 auto;
 }
 .admin-side {
