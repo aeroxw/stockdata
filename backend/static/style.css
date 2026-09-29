@@ -218,6 +218,7 @@ h1.hero-title {
 .status.ok { background: rgba(22,199,132,.13); color: var(--down); }
 .status.main { background: rgba(61,125,255,.15); color: #7aa5ff; }
 .status.partial { background: rgba(240,185,11,.13); color: var(--warn); }
+.status.err { background: rgba(240,69,58,.14); color: var(--up); }
 
 .source-desc { color: var(--text-dim); font-size: 14.5px; margin-bottom: 14px; min-height: 44px; }
 .source-tags { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -844,6 +845,9 @@ table.mini td, table.mini th { padding: 9px 10px; }
 }
 .src-card.is-ok::before { background: var(--down); }
 .src-card.is-warn::before { background: var(--warn); }
+/* 「异常」= 打过但全失败；与「未调用」（一次都没打过）必须区分开，
+   否则一个已经废掉的源会显示成灰条的"未调用"，看起来像没接入而不是坏了。 */
+.src-card.is-bad::before { background: var(--up); }
 .src-card.is-idle::before { background: var(--muted); }
 .src-card:hover { transform: translateY(-3px); border-color: rgba(61,125,255,.4); box-shadow: var(--shadow); }
 .src-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }

@@ -617,12 +617,19 @@ async function loadSources(silent) {
     const r = await SD.api('/sources');
     const rows = r.data || [];
     state.sources = rows;
-    const ok = rows.filter((s) => s.ok > 0 && !s.last_error).length;
+    const total = (s) => (s.ok || 0) + (s.fail || 0);
+    const ok = rows.filter((s) => total(s) > 0 && !s.last_error).length;
     const degraded = rows.filter((s) => s.ok > 0 && s.last_error).length;
+    //: 打了但一次都没成功 = 源已经废了。以前这种被算进"未调用"，
+    //: 结果故障源在面板上是一条灰线，看起来像没接入。
+    const broken = rows.filter((s) => !s.ok && s.fail > 0).length;
     document.getElementById('srcBadge').textContent = `${ok}/${rows.length}`;
     document.getElementById('kpiSrc').textContent = `${ok}/${rows.length}`;
-    document.getElementById('kpiSrcSub').innerHTML = degraded
-      ? `<span class="txt-warn">${degraded} 个源最近出错</span>`
+    const notes = [];
+    if (broken) notes.push(`<span class="txt-up">${broken} 个源不可用</span>`);
+    if (degraded) notes.push(`<span class="txt-warn">${degraded} 个源最近出错</span>`);
+    document.getElementById('kpiSrcSub').innerHTML = notes.length
+      ? notes.join(' · ')
       : '全部正常';
     if (!silent) renderSources(rows);
   } catch (e) {
@@ -634,14 +641,18 @@ function renderSources(rows) {
   const wrap = document.getElementById('srcWrap');
   if (!rows.length) { wrap.innerHTML = '<div class="empty">暂无数据源</div>'; return; }
   wrap.innerHTML = rows.map((s) => {
-    const healthy = s.ok > 0 && !s.last_error;
-    const warn = s.ok > 0 && !!s.last_error;
     const total = (s.ok || 0) + (s.fail || 0);
+    const healthy = total > 0 && !s.last_error;
+    const warn = s.ok > 0 && !!s.last_error;
+    const bad = !s.ok && s.fail > 0;        // 打过、全失败 —— 是真故障，不是"没调用"
     const rate = total ? ((s.ok / total) * 100).toFixed(0) : 0;
-    return `<div class="src-card ${healthy ? 'is-ok' : warn ? 'is-warn' : 'is-idle'}">
+    const cls = healthy ? 'is-ok' : warn ? 'is-warn' : bad ? 'is-bad' : 'is-idle';
+    const stCls = healthy ? 'ok' : warn ? 'partial' : bad ? 'err' : '';
+    const stTxt = healthy ? '正常' : warn ? '降级' : bad ? '异常' : '未调用';
+    return `<div class="src-card ${cls}">
       <div class="src-top">
         <div class="src-name">${esc(SRC_LABEL[s.source] || s.source)}</div>
-        <span class="status ${healthy ? 'ok' : warn ? 'partial' : ''}">${healthy ? '正常' : warn ? '降级' : '未调用'}</span>
+        <span class="status ${stCls}">${stTxt}</span>
       </div>
       <div class="src-code mono">${esc(s.source)}</div>
       <div class="src-metrics">

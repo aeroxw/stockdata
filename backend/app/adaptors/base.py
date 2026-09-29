@@ -142,6 +142,29 @@ class AdaptorError(Exception):
     """适配器取数失败。"""
 
 
+def explain_error(exc: BaseException) -> str:
+    """把 httpx 的英文网络异常翻译成能直接看懂的诊断。
+
+    后台「数据源监控」原样展示 `stats["last_error"]`，以前那里是一句
+    "Server disconnected without sending a response." —— 看的人既不知道
+    是谁的问题，也不知道该不该管。翻译之后至少能一眼分清
+    「上游限流」和「我们写错了」。
+    """
+    if isinstance(exc, httpx.RemoteProtocolError):
+        return (
+            "上游未返回任何响应就掐断了连接（原报文：Server disconnected "
+            "without sending a response）。多为上游按 IP 限流/反爬，属上游侧行为；"
+            "也可能是该接口已被上游下线"
+        )
+    if isinstance(exc, httpx.ConnectError):
+        return "连接上游失败（DNS 解析或建连被拒）"
+    if isinstance(exc, (httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout)):
+        return "等待上游响应超时"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"上游返回 HTTP {exc.response.status_code}"
+    return f"{type(exc).__name__}: {exc}"
+
+
 class BaseAdaptor(ABC):
     """所有数据源适配器的基类。"""
 
@@ -181,6 +204,12 @@ class BaseAdaptor(ABC):
     #: 冷却时长上限。连续失败越多冷却越久（指数退避），
     #: 但不能无限涨，否则上游早就恢复了我们还傻等着。
     circuit_cooldown_max: float = 600.0
+    #: 单次请求超时（秒）。
+    #:
+    #: 15s 对健康的源无所谓，但一个**已经废掉的源**会把调用方硬拖满 15 秒 ——
+    #: 熔断只在"失败之后"保护后续请求，第一次挨的打躲不掉。
+    #: 兜底源（尤其东财）调小一点，让它早点死心、早点下沉给下一个源。
+    request_timeout: float = 15.0
 
     def __init__(self) -> None:
         self._client: httpx.AsyncClient | None = None
@@ -222,7 +251,7 @@ class BaseAdaptor(ABC):
         if not self.keep_alive:
             headers["Connection"] = "close"
         return httpx.AsyncClient(
-            timeout=15.0,
+            timeout=self.request_timeout,
             follow_redirects=True,
             headers=headers,
         )
@@ -311,7 +340,7 @@ class BaseAdaptor(ABC):
                 await asyncio.sleep(self.retry_backoff * (attempt + 1))
 
         assert last is not None
-        self._record(False, int((time.perf_counter() - t0) * 1000), str(last))
+        self._record(False, int((time.perf_counter() - t0) * 1000), explain_error(last))
 
         #: 连续失败累计到阈值就进冷却。注意只在**重试全部耗尽**后才累加，
         #: 中途自愈的那次不算（成功分支已经清零了）。
@@ -327,8 +356,9 @@ class BaseAdaptor(ABC):
                 self._cooldown_until = time.perf_counter() + cd
                 self.stats["last_error"] = (
                     f"连续失败 {self._consec_fail} 次，冷却 {cd:.0f}s"
+                    f"（最近一次：{explain_error(last)}）"
                 )
-        raise AdaptorError(f"[{self.name}] {last}") from last
+        raise AdaptorError(f"[{self.name}] {explain_error(last)}") from last
 
     async def _get(
         self,

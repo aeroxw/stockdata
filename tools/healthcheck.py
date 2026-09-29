@@ -101,7 +101,14 @@ SNAP = [
 #: 东财的限流特征串。命中这些说明是**上游在限流**（外部环境），
 #: 不是我们的代码坏了 —— 记 WARN 而不是 FAIL，否则每次体检都被它带偏。
 #: 它排在快照链最后一位，限流时聚合器会自动下沉，取数不受影响。
-EM_LIMIT_HINTS = ("熔断冷却", "Server disconnected", "限流", "RemoteProtocol")
+#:
+#: 注意：错误文案在 base.explain_error() 里被翻译成中文了，
+#: 所以这里几种写法都要留着 —— 英文原串在旧日志里还有。
+EM_LIMIT_HINTS = (
+    "熔断冷却", "限流",
+    "上游未返回任何响应", "掐断了连接", "已被上游下线",
+    "Server disconnected", "RemoteProtocol",
+)
 
 
 def is_upstream_limited(js: dict) -> bool:
@@ -270,11 +277,18 @@ ck("兑换价 专业版15 / 旗舰版30",
 st, js = req("/points/logs?limit=5", tok=TOK)
 ck("积分流水可读", st == 200 and "items" in (js.get("data") or {}), f"{st}")
 
-#: 积分不足时兑换必须被拒，这是配额机制不会被人绕过的保证
+#: 积分不足时兑换必须被拒，这是配额机制不会被人绕过的保证。
+#: 这一项**只在管理员本人积分不够时才会真正执行**（够的话打过去会兑换成功，
+#: 那就把人家档位改了）。所以跳过时要显式打一行 SKIP，
+#: 否则每次体检的总项数会飘，容易被误读成"少了一项，是不是挂了"。
 cost_min = min((o["redeem_points"] for o in opts), default=0)
 if p.get("points", 0) < cost_min:
     st, js = req("/points/redeem", "POST", {"plan_code": "pro"}, tok=TOK)
     ck("积分不足时兑换被拒(400)", st == 400, f"{st} {js.get('detail')}")
+else:
+    print(f"  [SKIP] 积分不足时兑换被拒(400)  —— 当前 {p.get('points')} 分"
+          f"已够兑换（最低 {cost_min} 分），跳过以免误改档位；"
+          f"该分支由 backend/test_points.py 覆盖")
 
 sect("9. 支付已彻底移除（安全）")
 #: 开源版不该再有任何计费端点。这里逐个确认它们已经 404，
